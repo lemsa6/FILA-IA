@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Arquivos de backup
+*.zip
+*.rar
+*.tar
+*.gz
+*.bak
+
+# Node.js
+node_modules
+npm-debug.log
+
+# Laravel
+/vendor
+.env
+.env.backup
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+
+# Docker
+docker-compose*.yml
+.dockerignore
+
+# IDE
+/.idea
+/.vscode
+*.sublime-workspace
+
+# Outros
+/storage/*.key
+/public/hot
+/public/storage
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/logs/*
+!/storage/framework/cache/.gitkeep
+!/storage/framework/sessions/.gitkeep
+!/storage/framework/views/.gitkeep
+!/storage/logs/.gitkeep 
