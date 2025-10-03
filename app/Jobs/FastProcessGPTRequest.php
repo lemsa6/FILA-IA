@@ -18,7 +18,7 @@ class FastProcessGPTRequest implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 2; // Reduzido de 3 para 2
-    public $timeout = 25; // Reduzido de 60 para 25s
+    public $timeout = 20; // Reduzido de 25 para 20s
     public $maxExceptions = 2;
 
     protected GPTRequest $request;
@@ -37,12 +37,7 @@ class FastProcessGPTRequest implements ShouldQueue
         $startTime = microtime(true);
         
         try {
-            // ⚡ Marca como processando (sem DB update desnecessário)
-            $this->request->status = 'processing';
-            $this->request->started_at = now();
-            $this->request->save();
-
-            // ⚡ Processa com IA Service otimizado
+            // ⚡ Processa com IA Service otimizado (sem DB update inicial)
             $result = $iaService->generateCompletion(
                 $this->getPromptFromRequest(),
                 $this->getParametersFromRequest(),
@@ -57,11 +52,12 @@ class FastProcessGPTRequest implements ShouldQueue
             // ⚡ Tracking simples de tokens (assíncrono)
             $this->trackTokensAsync($result);
 
-            // ⚡ Finaliza request
+            // ⚡ UMA ÚNICA operação de banco com todos os dados
             $processingTime = round((microtime(true) - $startTime) * 1000);
             
             $this->request->update([
                 'status' => 'completed',
+                'started_at' => now()->subMilliseconds($processingTime), // Calcula o tempo de início
                 'result' => json_encode($result),
                 'processing_time' => $processingTime,
                 'completed_at' => now(),
@@ -70,14 +66,17 @@ class FastProcessGPTRequest implements ShouldQueue
                 'model' => $result['model'] ?? 'gpt-4.1-nano',
             ]);
 
-            Log::info('GPT request completed', [
-                'request_id' => $this->request->id,
-                'api_key_id' => $this->request->api_key_id,
-                'processing_time' => $processingTime,
-                'tokens_in' => $result['tokens_input'] ?? 0,
-                'tokens_out' => $result['tokens_output'] ?? 0,
-                'cache_hit' => $result['_cache_hit'] ?? false
-            ]);
+            // Log otimizado apenas para requests lentos (>3s) ou com cache miss
+            if ($processingTime > 3000 || !($result['_cache_hit'] ?? false)) {
+                Log::info('GPT request completed', [
+                    'request_id' => $this->request->id,
+                    'api_key_id' => $this->request->api_key_id,
+                    'processing_time' => $processingTime,
+                    'tokens_in' => $result['tokens_input'] ?? 0,
+                    'tokens_out' => $result['tokens_output'] ?? 0,
+                    'cache_hit' => $result['_cache_hit'] ?? false
+                ]);
+            }
 
         } catch (Exception $e) {
             $this->handleFailure($e, $startTime);

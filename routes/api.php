@@ -25,6 +25,16 @@ Route::get('/v1/test', function () {
     return response()->json(['message' => 'Rota de teste funcionando', 'timestamp' => now()]);
 });
 
+// Rota de teste adicional para debug
+Route::get('/debug', function () {
+    return response()->json(['message' => 'Debug API funcionando', 'timestamp' => now()]);
+});
+
+// Rota POST de teste sem middleware
+Route::post('/test-post', function () {
+    return response()->json(['message' => 'POST funcionando', 'timestamp' => now()]);
+});
+
 // Rotas protegidas por API key
 Route::middleware(\App\Http\Middleware\FastApiKeyMiddleware::class)->prefix('v1')->group(function () {
     // Rotas para requisições

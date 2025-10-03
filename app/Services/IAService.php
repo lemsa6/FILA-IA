@@ -78,14 +78,11 @@ class IAService
         $clientCacheKey = "gpt:client_{$apiKeyId}:prompt_{$promptHash}";
         $clientContextKey = "gpt:client_{$apiKeyId}:context_{$sessionId}";
         
-        // Verifica cache do cliente primeiro
+        // Verifica cache do cliente primeiro (otimizado)
         $cachedResponse = Cache::get($clientCacheKey);
         if ($cachedResponse) {
-            Log::info('Resposta encontrada em cache do cliente', [
-                'api_key_id' => $apiKeyId,
-                'session_id' => $sessionId,
-                'cache_hit' => true
-            ]);
+            // Adiciona flag de cache hit para otimização de logs
+            $cachedResponse['_cache_hit'] = true;
             return $cachedResponse;
         }
 
@@ -101,14 +98,15 @@ class IAService
                 // Prepara parâmetros OpenAI com compatibilidade para GPT-5
                 $defaultParams = $this->buildOpenAIParams($parameters, $messages);
 
-                // Remove parâmetros que já foram processados
-                $filteredParams = array_diff_key($parameters, ['temperature' => '', 'max_tokens' => '']);
+                // Remove parâmetros que já foram processados e garante que seja array
+                $parametersArray = is_array($parameters) ? $parameters : $parameters->toArray();
+                $filteredParams = array_diff_key($parametersArray, ['temperature' => '', 'max_tokens' => '']);
                 $params = array_merge($defaultParams, $filteredParams);
 
                 $response = Http::withHeaders([
                     'Authorization' => 'Bearer ' . $this->apiKey,
                     'Content-Type' => 'application/json'
-                ])->timeout(30)->post($this->apiUrl . '/chat/completions', $params);
+                ])->timeout(15)->post($this->apiUrl . '/chat/completions', $params);
 
                 if ($response->successful()) {
                     $openaiResult = $response->json();
@@ -172,7 +170,7 @@ class IAService
                         $response = Http::withHeaders([
                             'Authorization' => 'Bearer ' . $this->apiKey,
                             'Content-Type' => 'application/json'
-                        ])->timeout(30)->post($this->apiUrl . '/chat/completions', $fallbackParams);
+                        ])->timeout(15)->post($this->apiUrl . '/chat/completions', $fallbackParams);
                         
                         if ($response->successful()) {
                             $openaiResult = $response->json();
@@ -221,18 +219,27 @@ class IAService
             'content' => 'Você é um assistente inteligente e útil. Responda de forma clara e precisa.'
         ];
         
-        // Adiciona histórico da conversa (limitado)
+        // Adiciona histórico da conversa (limitado e otimizado)
         if (!empty($conversationHistory)) {
-            $recentHistory = array_slice($conversationHistory, -10); // Últimas 10 interações
+            $recentHistory = array_slice($conversationHistory, -5); // Reduzido para 5 interações
             
             foreach ($recentHistory as $interaction) {
+                // Limita tamanho das mensagens para evitar overhead
+                $userContent = strlen($interaction['prompt']) > 500 ? 
+                    substr($interaction['prompt'], 0, 500) . '...' : 
+                    $interaction['prompt'];
+                    
+                $assistantContent = strlen($interaction['response']) > 1000 ? 
+                    substr($interaction['response'], 0, 1000) . '...' : 
+                    $interaction['response'];
+                
                 $messages[] = [
                     'role' => 'user',
-                    'content' => $interaction['prompt']
+                    'content' => $userContent
                 ];
                 $messages[] = [
                     'role' => 'assistant',
-                    'content' => $interaction['response']
+                    'content' => $assistantContent
                 ];
             }
         }
@@ -381,12 +388,12 @@ class IAService
             // GPT-5 usa max_completion_tokens e precisa de mais espaço para raciocinar
             $baseParams['max_tokens'] = $parameters['max_tokens'] ?? $parameters['max_completion_tokens'] ?? 1024;
             
-            // Incluir temperatura para todos os modelos
-            $baseParams['temperature'] = $parameters['temperature'] ?? 0.7;
+            // Garante que temperatura seja float
+            $baseParams['temperature'] = (float) ($parameters['temperature'] ?? 0.7);
         } else {
             // GPT-3.5-turbo e outros modelos suportam todos os parâmetros padrão
-            $baseParams['temperature'] = $parameters['temperature'] ?? 0.7;
-            $baseParams['max_tokens'] = $parameters['max_tokens'] ?? 1000;
+            $baseParams['temperature'] = (float) ($parameters['temperature'] ?? 0.7);
+            $baseParams['max_tokens'] = (int) ($parameters['max_tokens'] ?? 1000);
         }
 
         return $baseParams;

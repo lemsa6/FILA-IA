@@ -22,6 +22,16 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
+// Rota de teste para debug
+Route::get('/test-web', function () {
+    return response()->json(['message' => 'Rota web funcionando', 'timestamp' => now()]);
+});
+
+// Simular API no web.php para teste
+Route::get('/api/test-direct', function () {
+    return response()->json(['message' => 'API direta funcionando', 'timestamp' => now()]);
+});
+
 Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 Route::get('/dashboard/api/data', [App\Http\Controllers\DashboardController::class, 'apiData'])->middleware(['auth', 'verified'])->name('dashboard.api.data');
 

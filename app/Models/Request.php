@@ -142,6 +142,27 @@ class Request extends Model
     }
 
     /**
+     * Mutator para normalizar parâmetros (garantir tipos corretos)
+     */
+    public function setParametersAttribute($value)
+    {
+        if (is_array($value)) {
+            // Converte strings numéricas para tipos corretos
+            if (isset($value['temperature'])) {
+                $value['temperature'] = (float) $value['temperature'];
+            }
+            if (isset($value['max_tokens'])) {
+                $value['max_tokens'] = (int) $value['max_tokens'];
+            }
+            if (isset($value['max_completion_tokens'])) {
+                $value['max_completion_tokens'] = (int) $value['max_completion_tokens'];
+            }
+        }
+        
+        $this->attributes['parameters'] = json_encode($value);
+    }
+
+    /**
      * Relacionamento com a chave de API.
      */
     public function apiKey()

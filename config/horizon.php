@@ -216,12 +216,12 @@ return [
                 'connection' => 'redis',
                 'queue' => ['default', 'gpt-requests'],
                 'balance' => 'auto',
-                'maxProcesses' => 8, // Aumentado de 3 para 8 workers
+                'maxProcesses' => 12, // Aumentado de 8 para 12 workers
                 'maxTime' => 0,
                 'maxJobs' => 0,
                 'memory' => 256, // Aumentado de 128 para 256MB
                 'tries' => 3,
-                'timeout' => 30, // Reduzido de 60 para 30s
+                'timeout' => 20, // Reduzido de 30 para 20s
                 'nice' => 0,
             ],
         ],

@@ -16,10 +16,31 @@ class FastApiKeyMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
+        // Log tentativa de acesso para auditoria
+        $ip = $request->ip();
+        $userAgent = $request->userAgent();
+        
         $apiKey = $request->header('X-API-Key') ?? $request->input('api_key');
 
         if (!$apiKey) {
+            // Log tentativa sem API key
+            \Log::warning('API access attempt without key', [
+                'ip' => $ip,
+                'user_agent' => $userAgent,
+                'path' => $request->path(),
+                'method' => $request->method()
+            ]);
             return response()->json(['error' => 'API key obrigatória'], 401);
+        }
+
+        // Validação básica do formato da API key
+        if (strlen($apiKey) < 32 || !ctype_alnum($apiKey)) {
+            \Log::warning('API access attempt with invalid key format', [
+                'ip' => $ip,
+                'key_length' => strlen($apiKey),
+                'path' => $request->path()
+            ]);
+            return response()->json(['error' => 'Formato de API key inválido'], 403);
         }
 
         // ⚡ CACHE FIRST - Evita DB query na maioria dos casos

@@ -3,7 +3,6 @@ FROM nginx:alpine
 # Instalar ferramentas de compressão e otimização
 RUN apk add --no-cache \
     gzip \
-    brotli \
     curl \
     && rm -rf /var/cache/apk/*
 
