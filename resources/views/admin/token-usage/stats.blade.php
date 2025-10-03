@@ -92,28 +92,28 @@
                         </svg>
                     </div>
                     <div class="ml-4">
-                        <div class="text-2xl font-bold text-gray-900">R$ {{ number_format($stats['total_cost_brl'] ?? 0, 2, ',', '.') }}</div>
+                        <div class="text-2xl font-bold text-gray-900">R$ {{ number_format($stats['total_cost_brl'] ?? 0, 4, ',', '.') }}</div>
                         <div class="text-sm text-gray-600">Custo Total (BRL)</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Gráficos e Análises -->
+        <!-- Gráficos REAIS e Análises -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <!-- Gráfico de Uso por Período -->
+            <!-- Gráfico de Evolução Mensal REAL -->
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Uso de Tokens por Período</h3>
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">📈 Evolução Mensal (Dados Reais)</h3>
                 <div class="h-64">
-                    <canvas id="tokensChart"></canvas>
+                    <canvas id="monthlyChart"></canvas>
                 </div>
             </div>
 
-            <!-- Distribuição de Custos -->
+            <!-- Distribuição por API Key REAL -->
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Distribuição de Custos</h3>
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">🔑 Top 5 APIs por Custo (Dados Reais)</h3>
                 <div class="h-64">
-                    <canvas id="costsChart"></canvas>
+                    <canvas id="apiChart"></canvas>
                 </div>
             </div>
         </div>
@@ -154,7 +154,7 @@
                         </div>
                         <div class="flex justify-between">
                             <span class="text-gray-600">Custo BRL:</span>
-                            <span class="font-medium">R$ {{ number_format($stats['total_cost_brl'] ?? 0, 2, ',', '.') }}</span>
+                            <span class="font-medium">R$ {{ number_format($stats['total_cost_brl'] ?? 0, 4, ',', '.') }}</span>
                         </div>
                     </div>
                 </div>
@@ -164,7 +164,7 @@
                     <div class="space-y-2">
                         <div class="flex justify-between">
                             <span class="text-gray-600">Período:</span>
-                            <span class="font-medium">{{ $period ?? 'Últimos 30 dias' }}</span>
+                            <span class="font-medium">{{ \Carbon\Carbon::parse($startDate)->format('d/m/Y') }} até {{ \Carbon\Carbon::parse($endDate)->format('d/m/Y') }}</span>
                         </div>
                         <div class="flex justify-between">
                             <span class="text-gray-600">Última Atualização:</span>
@@ -181,54 +181,82 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Gráfico de Uso de Tokens
-    const tokensCtx = document.getElementById('tokensChart').getContext('2d');
-    new Chart(tokensCtx, {
+    // 📈 Gráfico de Evolução Mensal REAL
+    const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+    
+    // Dados reais do backend
+    const monthlyData = @json($monthlyStats);
+    const monthLabels = monthlyData.map(item => {
+        const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        return months[item.month - 1] + '/' + item.year;
+    });
+    const inputTokens = monthlyData.map(item => item.input_tokens || 0);
+    const outputTokens = monthlyData.map(item => item.output_tokens || 0);
+    const costs = monthlyData.map(item => parseFloat(item.cost_brl || 0));
+    
+    new Chart(monthlyCtx, {
         type: 'line',
         data: {
-            labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+            labels: monthLabels,
             datasets: [{
-                label: 'Tokens de Entrada',
-                data: [1200, 1900, 3000, 5000, 2000, 3000],
+                label: 'Tokens Entrada',
+                data: inputTokens,
                 borderColor: 'rgb(59, 130, 246)',
                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                tension: 0.1
+                tension: 0.1,
+                yAxisID: 'y'
             }, {
-                label: 'Tokens de Saída',
-                data: [800, 1200, 2000, 3000, 1500, 2000],
+                label: 'Tokens Saída',
+                data: outputTokens,
                 borderColor: 'rgb(16, 185, 129)',
                 backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                tension: 0.1
+                tension: 0.1,
+                yAxisID: 'y'
+            }, {
+                label: 'Custo (R$)',
+                data: costs,
+                borderColor: 'rgb(245, 158, 11)',
+                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                tension: 0.1,
+                yAxisID: 'y1'
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    position: 'top',
-                }
+                legend: { position: 'top' },
+                title: { display: true, text: 'Últimos 6 meses - Dados Reais' }
             },
             scales: {
-                y: {
-                    beginAtZero: true
-                }
+                y: { type: 'linear', display: true, position: 'left', beginAtZero: true },
+                y1: { type: 'linear', display: true, position: 'right', beginAtZero: true, grid: { drawOnChartArea: false } }
             }
         }
     });
 
-    // Gráfico de Distribuição de Custos
-    const costsCtx = document.getElementById('costsChart').getContext('2d');
-    new Chart(costsCtx, {
+    // 🔑 Gráfico de APIs REAL
+    const apiCtx = document.getElementById('apiChart').getContext('2d');
+    
+    // Dados reais das APIs
+    const apiData = @json($apiStats);
+    const apiLabels = apiData.map(item => item.api_key ? item.api_key.name : 'API #' + item.api_key_id);
+    const apiCosts = apiData.map(item => parseFloat(item.cost_brl || 0));
+    const apiRequests = apiData.map(item => item.requests || 0);
+    
+    new Chart(apiCtx, {
         type: 'doughnut',
         data: {
-            labels: ['Tokens de Entrada', 'Tokens de Saída', 'Outros'],
+            labels: apiLabels,
             datasets: [{
-                data: [40, 35, 25],
+                label: 'Custo (R$)',
+                data: apiCosts,
                 backgroundColor: [
                     'rgb(59, 130, 246)',
                     'rgb(16, 185, 129)',
-                    'rgb(245, 158, 11)'
+                    'rgb(245, 158, 11)',
+                    'rgb(239, 68, 68)',
+                    'rgb(139, 92, 246)'
                 ]
             }]
         },
@@ -236,8 +264,17 @@ document.addEventListener('DOMContentLoaded', function() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    position: 'bottom',
+                legend: { position: 'bottom' },
+                title: { display: true, text: 'Distribuição Real de Custos por API' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const requests = apiRequests[context.dataIndex] || 0;
+                            return label + ': R$ ' + value.toFixed(4) + ' (' + requests + ' req)';
+                        }
+                    }
                 }
             }
         }

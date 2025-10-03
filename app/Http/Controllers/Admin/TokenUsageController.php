@@ -74,20 +74,18 @@ class TokenUsageController extends Controller
      */
     public function stats(Request $request)
     {
-        // Sistema simplificado: usar dados reais dos requests GPT
-        $query = GPTRequest::where('status', 'completed');
+        // 📅 Filtro padrão: últimos 6 meses para análises mais focadas
+        $startDate = $request->filled('start_date') ? $request->start_date : now()->subMonths(6)->format('Y-m-d');
+        $endDate = $request->filled('end_date') ? $request->end_date : now()->format('Y-m-d');
+        
+        // Sistema com dados reais dos requests GPT - período focado
+        $query = GPTRequest::where('status', 'completed')
+            ->whereDate('created_at', '>=', $startDate)
+            ->whereDate('created_at', '<=', $endDate);
 
-        // Filtros opcionais
+        // Filtros adicionais
         if ($request->filled('api_key_id')) {
             $query->where('api_key_id', $request->api_key_id);
-        }
-
-        if ($request->filled('start_date')) {
-            $query->whereDate('created_at', '>=', $request->start_date);
-        }
-
-        if ($request->filled('end_date')) {
-            $query->whereDate('created_at', '<=', $request->end_date);
         }
 
         $stats = $query->selectRaw('
@@ -104,20 +102,36 @@ class TokenUsageController extends Controller
             AVG(cost_brl) as avg_cost_brl
         ')->first();
 
-        // Dados para gráfico por período (últimos 30 dias)
-        $dailyStats = GPTRequest::selectRaw('DATE(created_at) as date, SUM(tokens_input + tokens_output) as tokens, COUNT(*) as requests')
+        // 📈 Dados REAIS para gráfico mensal (últimos 6 meses)
+        $monthlyStats = GPTRequest::selectRaw('
+            YEAR(created_at) as year,
+            MONTH(created_at) as month,
+            SUM(tokens_input) as input_tokens,
+            SUM(tokens_output) as output_tokens,
+            SUM(cost_brl) as cost_brl,
+            COUNT(*) as requests
+        ')
             ->where('status', 'completed')
-            ->whereDate('created_at', '>=', now()->subDays(30))
-            ->groupBy('date')
-            ->orderBy('date')
+            ->whereDate('created_at', '>=', $startDate)
+            ->whereDate('created_at', '<=', $endDate)
+            ->groupBy('year', 'month')
+            ->orderBy('year')
+            ->orderBy('month')
             ->get();
 
-        // Dados para gráfico por modelo
-        $modelStats = GPTRequest::selectRaw('model, COUNT(*) as count, SUM(tokens_input + tokens_output) as tokens')
+        // 📊 Dados REAIS para gráfico por API Key (top 5)
+        $apiStats = GPTRequest::with('apiKey')
+            ->selectRaw('
+                api_key_id,
+                COUNT(*) as requests,
+                SUM(cost_brl) as cost_brl,
+                SUM(tokens_input + tokens_output) as total_tokens
+            ')
             ->where('status', 'completed')
-            ->whereNotNull('model')
-            ->groupBy('model')
-            ->orderBy('tokens', 'desc')
+            ->whereDate('created_at', '>=', $startDate)
+            ->whereDate('created_at', '<=', $endDate)
+            ->groupBy('api_key_id')
+            ->orderBy('cost_brl', 'desc')
             ->limit(5)
             ->get();
 
@@ -126,9 +140,11 @@ class TokenUsageController extends Controller
 
         return view('admin.token-usage.stats', compact(
             'stats',
-            'dailyStats',
-            'modelStats',
-            'apiKeys'
+            'monthlyStats',
+            'apiStats',
+            'apiKeys',
+            'startDate',
+            'endDate'
         ));
     }
 
