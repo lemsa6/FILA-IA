@@ -18,35 +18,45 @@ class TokenUsageController extends Controller
      */
     public function index(Request $request)
     {
+        // 📅 Filtro padrão: últimos 30 dias se não especificado
+        $startDate = $request->filled('start_date') ? $request->start_date : now()->subDays(30)->format('Y-m-d');
+        $endDate = $request->filled('end_date') ? $request->end_date : now()->format('Y-m-d');
+        
         // Sistema simplificado: usar dados reais dos requests GPT
         $query = GPTRequest::with(['apiKey'])->where('status', 'completed');
 
-        // Filtros
+        // Aplicar filtro de período (sempre aplicado)
+        $query->whereDate('created_at', '>=', $startDate)
+              ->whereDate('created_at', '<=', $endDate);
+
+        // Filtros adicionais
         if ($request->filled('api_key_id')) {
             $query->where('api_key_id', $request->api_key_id);
         }
 
-        if ($request->filled('start_date')) {
-            $query->whereDate('created_at', '>=', $request->start_date);
-        }
-
-        if ($request->filled('end_date')) {
-            $query->whereDate('created_at', '<=', $request->end_date);
-        }
-
         $logs = $query->orderBy('created_at', 'desc')->paginate(50);
         
-        // Estatísticas reais baseadas nos requests processados
+        // 📊 Estatísticas baseadas nos mesmos filtros aplicados
+        $statsQuery = GPTRequest::where('status', 'completed')
+            ->whereDate('created_at', '>=', $startDate)
+            ->whereDate('created_at', '<=', $endDate);
+            
+        if ($request->filled('api_key_id')) {
+            $statsQuery->where('api_key_id', $request->api_key_id);
+        }
+        
         $stats = [
-            'total_requests' => GPTRequest::where('status', 'completed')->count(),
-            'total_input_tokens' => GPTRequest::where('status', 'completed')->sum('tokens_input'),
-            'total_output_tokens' => GPTRequest::where('status', 'completed')->sum('tokens_output'),
-            'total_tokens' => GPTRequest::where('status', 'completed')->sum(DB::raw('tokens_input + tokens_output')),
-            'avg_processing_time' => GPTRequest::where('status', 'completed')->avg('processing_time'),
-            'total_cost_usd' => GPTRequest::where('status', 'completed')->sum('cost_usd'),
-            'total_cost_brl' => GPTRequest::where('status', 'completed')->sum('cost_brl'),
-            'avg_cost_usd' => GPTRequest::where('status', 'completed')->avg('cost_usd'),
-            'avg_cost_brl' => GPTRequest::where('status', 'completed')->avg('cost_brl'),
+            'total_requests' => $statsQuery->count(),
+            'total_input_tokens' => $statsQuery->sum('tokens_input'),
+            'total_output_tokens' => $statsQuery->sum('tokens_output'),
+            'total_tokens' => $statsQuery->sum(DB::raw('tokens_input + tokens_output')),
+            'avg_processing_time' => $statsQuery->avg('processing_time'),
+            'total_cost_usd' => $statsQuery->sum('cost_usd'),
+            'total_cost_brl' => $statsQuery->sum('cost_brl'),
+            'avg_cost_usd' => $statsQuery->avg('cost_usd'),
+            'avg_cost_brl' => $statsQuery->avg('cost_brl'),
+            'period_start' => $startDate,
+            'period_end' => $endDate,
         ];
 
         // APIs disponíveis para filtro

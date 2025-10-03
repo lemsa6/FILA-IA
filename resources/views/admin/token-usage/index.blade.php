@@ -48,60 +48,76 @@
 
         <!-- Filtros -->
         <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
-            <form method="GET" action="{{ route('admin.token-usage.index') }}" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                    <label for="api_key_id" class="block text-sm font-medium text-gray-700 mb-1">Chave de API</label>
-                    <select name="api_key_id" id="api_key_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                        <option value="">Todas as chaves</option>
-                        @foreach($apiKeys ?? [] as $apiKey)
-                            <option value="{{ $apiKey->id }}" {{ request('api_key_id') == $apiKey->id ? 'selected' : '' }}>
-                                {{ $apiKey->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
+            <form method="GET" action="{{ route('admin.token-usage.index') }}" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label for="api_key_id" class="block text-sm font-medium text-gray-700 mb-1">Chave de API</label>
+                        <select name="api_key_id" id="api_key_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                            <option value="">Todas as chaves</option>
+                            @foreach($apiKeys ?? [] as $apiKey)
+                                <option value="{{ $apiKey->id }}" {{ request('api_key_id') == $apiKey->id ? 'selected' : '' }}>
+                                    {{ $apiKey->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
 
-                <div>
-                    <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                    <select name="status" id="status" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                        <option value="">Todos os status</option>
-                        <option value="success" {{ request('status') == 'success' ? 'selected' : '' }}>Sucesso</option>
-                        <option value="failed" {{ request('status') == 'failed' ? 'selected' : '' }}>Falha</option>
-                        <option value="partial" {{ request('status') == 'partial' ? 'selected' : '' }}>Parcial</option>
-                    </select>
-                </div>
+                    <div>
+                        <label for="start_date" class="block text-sm font-medium text-gray-700 mb-1">📅 Data de Entrada</label>
+                        <input type="date" name="start_date" id="start_date" 
+                               value="{{ request('start_date', $stats['period_start'] ?? '') }}" 
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                    </div>
 
-                <div>
-                    <label for="date_from" class="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
-                    <input type="date" name="date_from" id="date_from" value="{{ request('date_from') }}" 
-                           class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                </div>
+                    <div>
+                        <label for="end_date" class="block text-sm font-medium text-gray-700 mb-1">📅 Data de Saída</label>
+                        <input type="date" name="end_date" id="end_date" 
+                               value="{{ request('end_date', $stats['period_end'] ?? '') }}" 
+                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                    </div>
 
-                <div class="flex items-end">
-                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200">
-                        Filtrar
-                    </button>
+                    <div class="flex items-end">
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200">
+                            🔍 Filtrar
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Período Atual -->
+                <div class="text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
+                    📊 <strong>Período atual:</strong> {{ \Carbon\Carbon::parse($stats['period_start'])->format('d/m/Y') }} até {{ \Carbon\Carbon::parse($stats['period_end'])->format('d/m/Y') }}
+                    @if(!request('start_date') && !request('end_date'))
+                        <span class="text-indigo-600 font-medium">(Últimos 30 dias - padrão)</span>
+                    @endif
                 </div>
             </form>
         </div>
 
         <!-- Estatísticas Rápidas -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
             <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                <div class="text-2xl font-bold text-gray-900">{{ number_format($logs->total()) }}</div>
-                <div class="text-sm text-gray-600">Total de Requisições</div>
+                <div class="text-2xl font-bold text-gray-900">{{ number_format($stats['total_requests'] ?? 0) }}</div>
+                <div class="text-sm text-gray-600">📊 Requisições</div>
             </div>
             <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
                 <div class="text-2xl font-bold text-green-600">{{ number_format($stats['total_input_tokens'] ?? 0) }}</div>
-                <div class="text-sm text-gray-600">Tokens de Entrada</div>
+                <div class="text-sm text-gray-600">🔤 Tokens Entrada</div>
             </div>
             <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
                 <div class="text-2xl font-bold text-blue-600">{{ number_format($stats['total_output_tokens'] ?? 0) }}</div>
-                <div class="text-sm text-gray-600">Tokens de Saída</div>
+                <div class="text-sm text-gray-600">💬 Tokens Saída</div>
+            </div>
+            <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                <div class="text-2xl font-bold text-red-600">${{ number_format($stats['total_cost_usd'] ?? 0, 6) }}</div>
+                <div class="text-sm text-gray-600">💰 Total USD</div>
+            </div>
+            <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                <div class="text-2xl font-bold text-orange-600">R$ {{ number_format($stats['total_cost_brl'] ?? 0, 4) }}</div>
+                <div class="text-sm text-gray-600">🇧🇷 Total BRL</div>
             </div>
             <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
                 <div class="text-2xl font-bold text-purple-600">{{ number_format(($stats['avg_processing_time'] ?? 0), 0) }}ms</div>
-                <div class="text-sm text-gray-600">Tempo Médio</div>
+                <div class="text-sm text-gray-600">⚡ Tempo Médio</div>
             </div>
         </div>
 
