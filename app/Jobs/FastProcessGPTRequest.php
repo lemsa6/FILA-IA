@@ -55,15 +55,25 @@ class FastProcessGPTRequest implements ShouldQueue
             // ⚡ UMA ÚNICA operação de banco com todos os dados
             $processingTime = round((microtime(true) - $startTime) * 1000);
             
+            // 💰 Calcula custos baseados no modelo
+            $tokensInput = $result['tokens_input'] ?? 0;
+            $tokensOutput = $result['tokens_output'] ?? 0;
+            $model = $result['model'] ?? 'gpt-4.1-nano';
+            
+            $costUsd = $this->calculateCost($tokensInput, $tokensOutput, $model);
+            $costBrl = $costUsd * 5.5; // Taxa de câmbio aproximada
+            
             $this->request->update([
                 'status' => 'completed',
                 'started_at' => now()->subMilliseconds($processingTime), // Calcula o tempo de início
                 'result' => json_encode($result),
                 'processing_time' => $processingTime,
                 'completed_at' => now(),
-                'tokens_input' => $result['tokens_input'] ?? 0,
-                'tokens_output' => $result['tokens_output'] ?? 0,
-                'model' => $result['model'] ?? 'gpt-4.1-nano',
+                'tokens_input' => $tokensInput,
+                'tokens_output' => $tokensOutput,
+                'model' => $model,
+                'cost_usd' => $costUsd,
+                'cost_brl' => $costBrl,
             ]);
 
             // Log otimizado apenas para requests lentos (>3s) ou com cache miss
@@ -166,6 +176,22 @@ class FastProcessGPTRequest implements ShouldQueue
     private function getParametersFromRequest(): array
     {
         return $this->request->parameters ?? [];
+    }
+
+    /**
+     * Calcula o custo baseado no número de tokens e modelo GPT
+     */
+    private function calculateCost(int $tokensInput, int $tokensOutput, string $model): float
+    {
+        // Preços do GPT-4.1-nano (por 1M tokens) - Atualizados em Out/2025
+        $inputPricePerMillion = 0.20;  // $0.20 por 1M tokens de entrada
+        $outputPricePerMillion = 0.80; // $0.80 por 1M tokens de saída
+
+        // Calcula custos
+        $inputCost = ($tokensInput / 1_000_000) * $inputPricePerMillion;
+        $outputCost = ($tokensOutput / 1_000_000) * $outputPricePerMillion;
+
+        return round($inputCost + $outputCost, 6); // 6 casas decimais para precisão
     }
 }
 

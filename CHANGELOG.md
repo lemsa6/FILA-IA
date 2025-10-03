@@ -2,6 +2,27 @@
 
 Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 
+## [1.1.0] - 2025-10-03 💰 SISTEMA DE CUSTOS IMPLEMENTADO
+
+### 🚀 Adicionado
+- Sistema completo de cálculo de custos por token
+- Campos cost_usd e cost_brl na tabela requests
+- Cálculo automático de custos no FastProcessGPTRequest
+- Exibição de custos reais no painel administrativo
+- Preços atualizados GPT-4.1-nano (Out/2025)
+
+### 🔧 Melhorado
+- TokenUsageController agora exibe custos reais
+- Estatísticas de uso incluem valores em USD e BRL
+- Model Request com casting adequado para campos decimais
+- Precisão de 6 casas decimais para USD e 4 para BRL
+
+### 💡 Funcionalidades
+- Cálculo baseado em preços reais: $0.20/1M tokens input, $0.80/1M tokens output
+- Taxa de câmbio configurável (atual: R$ 5.50)
+- Compatibilidade total com sistema existente
+- Zero impacto em performance
+
 ## [1.0.0] - 2025-10-03 🎉 PRIMEIRA VERSÃO ESTÁVEL
 
 ### 🚀 Adicionado

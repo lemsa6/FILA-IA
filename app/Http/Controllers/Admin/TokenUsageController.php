@@ -43,6 +43,10 @@ class TokenUsageController extends Controller
             'total_output_tokens' => GPTRequest::where('status', 'completed')->sum('tokens_output'),
             'total_tokens' => GPTRequest::where('status', 'completed')->sum(DB::raw('tokens_input + tokens_output')),
             'avg_processing_time' => GPTRequest::where('status', 'completed')->avg('processing_time'),
+            'total_cost_usd' => GPTRequest::where('status', 'completed')->sum('cost_usd'),
+            'total_cost_brl' => GPTRequest::where('status', 'completed')->sum('cost_brl'),
+            'avg_cost_usd' => GPTRequest::where('status', 'completed')->avg('cost_usd'),
+            'avg_cost_brl' => GPTRequest::where('status', 'completed')->avg('cost_brl'),
         ];
 
         // APIs disponíveis para filtro
@@ -83,13 +87,12 @@ class TokenUsageController extends Controller
             SUM(tokens_input + tokens_output) as total_tokens,
             AVG(tokens_input) as avg_input_tokens,
             AVG(tokens_output) as avg_output_tokens,
-            AVG(processing_time) as avg_processing_time
+            AVG(processing_time) as avg_processing_time,
+            SUM(cost_usd) as total_cost_usd,
+            SUM(cost_brl) as total_cost_brl,
+            AVG(cost_usd) as avg_cost_usd,
+            AVG(cost_brl) as avg_cost_brl
         ')->first();
-
-        // Sem custos no sistema simplificado
-        $stats->total_cost_brl = 0;
-        $stats->total_cost_usd = 0;
-        $stats->avg_cost_brl = 0;
 
         // Dados para gráfico por período (últimos 30 dias)
         $dailyStats = GPTRequest::selectRaw('DATE(created_at) as date, SUM(tokens_input + tokens_output) as tokens, COUNT(*) as requests')

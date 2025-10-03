@@ -35,6 +35,8 @@ class Request extends Model
         'response_time',
         'tokens_input',
         'tokens_output',
+        'cost_usd',
+        'cost_brl',
         'completed_at',
     ];
 
@@ -50,6 +52,8 @@ class Request extends Model
         'response_time' => 'float',
         'tokens_input' => 'integer',
         'tokens_output' => 'integer',
+        'cost_usd' => 'decimal:6',
+        'cost_brl' => 'decimal:4',
         'priority' => 'integer',
         'attempts' => 'integer',
         'completed_at' => 'datetime',
