@@ -2,16 +2,16 @@
 
 Sistema de filas inteligente para processamento de requisições GPT com Laravel Horizon e Redis.
 
-## 🚀 Versão 0.1.1
+## 🚀 Versão 1.1.0
 
 ### ✨ Funcionalidades
 
-- **Processamento de Filas**: Sistema robusto de filas com Laravel Horizon
-- **Integração GPT**: Processamento de requisições OpenAI GPT-4
-- **Cache Inteligente**: Sistema de cache por cliente para otimização
-- **Circuit Breaker**: Proteção contra falhas de serviços externos
-- **Docker**: Containerização completa do sistema
-- **Monitoramento**: Logs detalhados e métricas de performance
+- **💰 Sistema de Custos**: Cálculo automático de custos USD/BRL por token
+- **📊 Estatísticas Reais**: Dashboards com dados reais e gráficos dinâmicos
+- **🔒 Segurança Avançada**: Rate limiting, auditoria e validação de API keys
+- **⚡ Performance Otimizada**: 3-5s por requisição, cache inteligente
+- **📈 Monitoramento**: Horizon dashboard, logs e métricas detalhadas
+- **🐳 Docker**: Containerização completa com Nginx otimizado
 
 ### 🏗️ Arquitetura
 
@@ -83,11 +83,13 @@ docker exec fila-api tail -f storage/logs/laravel.log
 
 ### 📝 Changelog
 
-#### v0.1.1 (2025-08-28)
-- ✅ Adicionada coluna `started_at` na tabela `requests`
-- ✅ Corrigidos jobs falhando por schema incompleto
-- ✅ Otimizado processamento de filas
-- ✅ Melhorada confiabilidade do sistema
+#### v1.1.0 (2025-10-03) 💰 SISTEMA DE CUSTOS
+- ✅ **Sistema completo de custos**: Cálculo automático USD/BRL por token
+- ✅ **Estatísticas reais**: Dashboards com dados reais e gráficos dinâmicos
+- ✅ **Filtros avançados**: Período de 6 meses, datas personalizáveis
+- ✅ **Segurança aprimorada**: Rate limiting, auditoria e logs
+- ✅ **Performance otimizada**: Redução de 10-15s para 3-5s por requisição
+- ✅ **Projeto limpo**: Remoção de arquivos desnecessários e otimização
 
 ### 📄 Licença
 
