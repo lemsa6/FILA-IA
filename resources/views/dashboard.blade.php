@@ -343,7 +343,7 @@
                                 <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                                 </svg>
-                                <p class="text-lg font-medium">Nenhuma requisição nas últimas 24h</p>
+                                <p class="text-lg font-medium">Nenhuma requisição nos últimos 30 dias</p>
                                 <p class="text-sm">Faça algumas requisições para ver o gráfico</p>
                             </div>
                         </div>
@@ -363,15 +363,21 @@
                 }]
             };
 
+            // Dados REAIS das filas
             const queueData = {
-                labels: ['Default', 'High', 'Low', 'Failed'],
+                labels: ['Pendentes', 'Processando', 'Completadas', 'Falhadas'],
                 datasets: [{
-                    label: 'Jobs na Fila',
-                    data: [5, 2, 1, 0],
+                    label: 'Status das Requisições',
+                    data: [
+                        @json($totalRequests - $completedRequests - $failedRequests),
+                        @json($processingRequests),
+                        @json($completedRequests),
+                        @json($failedRequests)
+                    ],
                     backgroundColor: [
                         'rgba(234, 179, 8, 0.8)',
-                        'rgba(0, 0, 0, 0.8)',
-                        'rgba(234, 179, 8, 0.6)',
+                        'rgba(59, 130, 246, 0.8)',
+                        'rgba(34, 197, 94, 0.8)',
                         'rgba(239, 68, 68, 0.8)'
                     ]
                 }]

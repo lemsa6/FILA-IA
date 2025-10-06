@@ -118,8 +118,8 @@ class DashboardController extends Controller
                 ->count();
             $cacheHitRate = $successfulRequests > 0 ? ($cacheHitCount / $successfulRequests) * 100 : 0;
             
-            // Requisições por hora (últimas 24h)
-            $requestsPerHour = GPTRequest::where('created_at', '>=', now()->subHours(24))
+            // Requisições por hora (últimos 30 dias)
+            $requestsPerHour = GPTRequest::where('created_at', '>=', now()->subDays(30))
                 ->selectRaw('HOUR(created_at) as hour, COUNT(*) as count')
                 ->groupBy('hour')
                 ->orderBy('hour')
@@ -130,7 +130,7 @@ class DashboardController extends Controller
                 'count' => $requestsPerHour->count(),
                 'data' => $requestsPerHour->toArray(),
                 'total_requests' => GPTRequest::count(),
-                'last_24h_requests' => GPTRequest::where('created_at', '>=', now()->subHours(24))->count()
+                'last_30d_requests' => GPTRequest::where('created_at', '>=', now()->subDays(30))->count()
             ]);
             
             return [
