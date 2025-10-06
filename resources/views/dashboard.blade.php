@@ -116,22 +116,64 @@
                         </div>
                     </div>
 
-                    <!-- Gráfico de Performance -->
+                    <!-- Estatísticas de Performance -->
                     <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
                         <div class="p-6">
-                            <h3 class="text-lg font-bold text-gray-900 mb-4">Performance das Requisições</h3>
-                            <div class="h-64">
-                                <canvas id="performanceChart"></canvas>
+                            <h3 class="text-lg font-bold text-gray-900 mb-4">📊 Estatísticas de Performance</h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="text-center p-4 bg-blue-50 rounded-lg">
+                                    <div class="text-2xl font-bold text-blue-600">{{ $performanceStats['avg_processing_time'] ?? 0 }}ms</div>
+                                    <div class="text-sm text-gray-600">Tempo Médio</div>
+                                </div>
+                                <div class="text-center p-4 bg-green-50 rounded-lg">
+                                    <div class="text-2xl font-bold text-green-600">{{ $performanceStats['success_rate'] ?? 0 }}%</div>
+                                    <div class="text-sm text-gray-600">Taxa de Sucesso</div>
+                                </div>
+                                <div class="text-center p-4 bg-yellow-50 rounded-lg">
+                                    <div class="text-2xl font-bold text-yellow-600">{{ $performanceStats['cache_hit_rate'] ?? 0 }}%</div>
+                                    <div class="text-sm text-gray-600">Cache Hit Rate</div>
+                                </div>
+                                <div class="text-center p-4 bg-purple-50 rounded-lg">
+                                    <div class="text-2xl font-bold text-purple-600">{{ $performanceStats['successful_requests'] ?? 0 }}</div>
+                                    <div class="text-sm text-gray-600">Req. Completadas</div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Gráfico de Filas -->
+                    <!-- Status das Requisições -->
                     <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
                         <div class="p-6">
-                            <h3 class="text-lg font-bold text-gray-900 mb-4">Status das Filas</h3>
-                            <div class="h-64">
-                                <canvas id="queueChart"></canvas>
+                            <h3 class="text-lg font-bold text-gray-900 mb-4">🔄 Status das Requisições</h3>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                                    <div class="flex items-center">
+                                        <div class="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                                        <span class="font-medium text-gray-700">Completadas</span>
+                                    </div>
+                                    <span class="text-lg font-bold text-green-600">{{ $completedRequests ?? 0 }}</span>
+                                </div>
+                                <div class="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                                    <div class="flex items-center">
+                                        <div class="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
+                                        <span class="font-medium text-gray-700">Em Processamento</span>
+                                    </div>
+                                    <span class="text-lg font-bold text-blue-600">{{ $processingRequests ?? 0 }}</span>
+                                </div>
+                                <div class="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
+                                    <div class="flex items-center">
+                                        <div class="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
+                                        <span class="font-medium text-gray-700">Pendentes</span>
+                                    </div>
+                                    <span class="text-lg font-bold text-yellow-600">{{ ($totalRequests ?? 0) - ($completedRequests ?? 0) - ($failedRequests ?? 0) - ($processingRequests ?? 0) }}</span>
+                                </div>
+                                <div class="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                                    <div class="flex items-center">
+                                        <div class="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
+                                        <span class="font-medium text-gray-700">Falhadas</span>
+                                    </div>
+                                    <span class="text-lg font-bold text-red-600">{{ $failedRequests ?? 0 }}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -259,11 +301,7 @@
         </div>
     </div>
 
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
     <script>
-        let performanceChart, queueChart, requestsChart;
 
         // Função para atualizar o dashboard
         function refreshDashboard() {
@@ -271,7 +309,6 @@
             document.getElementById('system-update').textContent = new Date().toLocaleTimeString();
             
             updateServiceStatus();
-            updateCharts();
             updateTokenStats();
         }
 
@@ -320,84 +357,6 @@
                 });
         }
 
-        // Função para atualizar gráficos
-        function updateCharts() {
-            // Dados REAIS do backend
-            const requestsPerHour = @json($performanceStats['requests_per_hour'] ?? []);
-            
-            // DEBUG: Log no console
-            console.log('=== DASHBOARD DEBUG ===');
-            console.log('performanceStats:', @json($performanceStats));
-            console.log('requestsPerHour:', requestsPerHour);
-            console.log('totalRequests:', @json($totalRequests ?? 0));
-            console.log('completedRequests:', @json($completedRequests ?? 0));
-            console.log('failedRequests:', @json($failedRequests ?? 0));
-            console.log('processingRequests:', @json($processingRequests ?? 0));
-            console.log('======================');
-            
-            // Verificar se há dados
-            if (!requestsPerHour || requestsPerHour.length === 0) {
-                // Mostrar mensagem quando não há dados
-                const performanceChartElement = document.getElementById('performanceChart');
-                if (performanceChartElement) {
-                    performanceChartElement.parentElement.innerHTML = `
-                        <div class="flex items-center justify-center h-64 text-gray-500">
-                            <div class="text-center">
-                                <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                </svg>
-                                <p class="text-lg font-medium">Nenhuma requisição nos últimos 30 dias</p>
-                                <p class="text-sm">Faça algumas requisições para ver o gráfico</p>
-                            </div>
-                        </div>
-                    `;
-                }
-                return;
-            }
-            
-            const performanceData = {
-                labels: requestsPerHour.map(item => String(item.hour).padStart(2, '0') + ':00'),
-                datasets: [{
-                    label: 'Requisições por Hora',
-                    data: requestsPerHour.map(item => item.count),
-                    borderColor: '#EAB308',
-                    backgroundColor: 'rgba(234, 179, 8, 0.1)',
-                    tension: 0.4
-                }]
-            };
-
-            // Dados REAIS das filas
-            const queueData = {
-                labels: ['Pendentes', 'Processando', 'Completadas', 'Falhadas'],
-                datasets: [{
-                    label: 'Status das Requisições',
-                    data: [
-                        @json($totalRequests - $completedRequests - $failedRequests),
-                        @json($processingRequests),
-                        @json($completedRequests),
-                        @json($failedRequests)
-                    ],
-                    backgroundColor: [
-                        'rgba(234, 179, 8, 0.8)',
-                        'rgba(59, 130, 246, 0.8)',
-                        'rgba(34, 197, 94, 0.8)',
-                        'rgba(239, 68, 68, 0.8)'
-                    ]
-                }]
-            };
-
-            // Atualiza gráfico de performance
-            if (performanceChart) {
-                performanceChart.data = performanceData;
-                performanceChart.update();
-            }
-
-            // Atualiza gráfico de filas
-            if (queueChart) {
-                queueChart.data = queueData;
-                queueChart.update();
-            }
-        }
 
         // Função para atualizar estatísticas de tokens
         function updateTokenStats() {
@@ -451,68 +410,11 @@
                 }
             });
 
-            // Gráfico de Performance
-            const performanceCtx = document.getElementById('performanceChart').getContext('2d');
-            performanceChart = new Chart(performanceCtx, {
-                type: 'line',
-                data: performanceData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.1)'
-                            }
-                        },
-                        x: {
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.1)'
-                            }
-                        }
-                    }
-                }
-            });
-
-            // Gráfico de Filas
-            const queueCtx = document.getElementById('queueChart').getContext('2d');
-            queueChart = new Chart(queueCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Default', 'High', 'Low', 'Failed'],
-                    datasets: [{
-                        label: 'Jobs na Fila',
-                        data: [5, 2, 1, 0],
-                        backgroundColor: [
-                            '#3B82F6',
-                            '#10B981',
-                            '#F59E0B',
-                            '#EF4444'
-                        ]
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    }
-                }
-            });
 
             updateServiceStatus();
             
             // Atualiza a cada 30 segundos
             setInterval(updateServiceStatus, 30000);
-            setInterval(updateCharts, 30000);
         });
     </script>
 @endsection
