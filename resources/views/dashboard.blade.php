@@ -322,12 +322,34 @@
 
         // Função para atualizar gráficos
         function updateCharts() {
-            // Dados de exemplo - substitua por dados reais da API
+            // Dados REAIS do backend
+            const requestsPerHour = @json($performanceStats['requests_per_hour'] ?? []);
+            
+            // Verificar se há dados
+            if (requestsPerHour.length === 0) {
+                // Mostrar mensagem quando não há dados
+                const performanceChartElement = document.getElementById('performanceChart');
+                if (performanceChartElement) {
+                    performanceChartElement.parentElement.innerHTML = `
+                        <div class="flex items-center justify-center h-64 text-gray-500">
+                            <div class="text-center">
+                                <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                </svg>
+                                <p class="text-lg font-medium">Nenhuma requisição nas últimas 24h</p>
+                                <p class="text-sm">Faça algumas requisições para ver o gráfico</p>
+                            </div>
+                        </div>
+                    `;
+                }
+                return;
+            }
+            
             const performanceData = {
-                labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+                labels: requestsPerHour.map(item => str_pad(item.hour, 2, '0', STR_PAD_LEFT) + ':00'),
                 datasets: [{
-                    label: 'Tempo de Resposta (ms)',
-                    data: [120, 95, 150, 80, 110, 130],
+                    label: 'Requisições por Hora',
+                    data: requestsPerHour.map(item => item.count),
                     borderColor: '#EAB308',
                     backgroundColor: 'rgba(234, 179, 8, 0.1)',
                     tension: 0.4
@@ -418,10 +440,10 @@
             performanceChart = new Chart(performanceCtx, {
                 type: 'line',
                 data: {
-                    labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+                    labels: requestsPerHour.map(item => str_pad(item.hour, 2, '0', STR_PAD_LEFT) + ':00'),
                     datasets: [{
-                        label: 'Tempo de Resposta (ms)',
-                        data: [120, 95, 150, 80, 110, 130],
+                        label: 'Requisições por Hora',
+                        data: requestsPerHour.map(item => item.count),
                         borderColor: '#3B82F6',
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
                         tension: 0.4,

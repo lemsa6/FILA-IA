@@ -258,7 +258,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Dados reais das APIs
     const apiData = @json($apiStats);
-    
+ NÁO ESTA HARCODED?    
     // Verificar se há dados
     if (apiData.length === 0) {
         // Mostrar mensagem quando não há dados
