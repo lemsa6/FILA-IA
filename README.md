@@ -2,7 +2,7 @@
 
 Sistema de filas inteligente para processamento de requisições GPT com Laravel Horizon e Redis.
 
-## 🚀 Versão 1.1.0
+## 🚀 Versão 1.2.0
 
 ### ✨ Funcionalidades
 

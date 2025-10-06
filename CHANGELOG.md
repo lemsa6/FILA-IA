@@ -2,6 +2,31 @@
 
 Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 
+## [1.2.0] - 2025-10-06 🧹 SISTEMA LIMPO E OTIMIZADO
+
+### 🚀 Adicionado
+- Sistema 100% funcional apenas com migrations
+- Estrutura de banco limpa e otimizada
+- Migrations organizadas e sem duplicatas
+
+### 🔧 Melhorado
+- Removidas 6 migrations desnecessárias (plans, billing_cycles, token_usage_logs)
+- Eliminadas referências órfãs no código
+- Sistema mais leve e performático
+- Migrations testadas e funcionais do zero
+
+### 🗑️ Removido
+- Tabelas não utilizadas: plans, billing_cycles, plan_assignments, token_usage_logs
+- Models desnecessários: TokenUsageLog
+- Migrations duplicadas e vazias
+- Referências órfãs no código
+
+### 💡 Funcionalidades
+- Sistema funciona 100% com migrate:fresh
+- 11 migrations essenciais mantidas
+- Todas as 27 rotas admin funcionando
+- Zero dependências de dumps de banco
+
 ## [1.1.0] - 2025-10-03 💰 SISTEMA DE CUSTOS IMPLEMENTADO
 
 ### 🚀 Adicionado

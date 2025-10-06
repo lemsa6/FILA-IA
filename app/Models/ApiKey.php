@@ -49,10 +49,6 @@ class ApiKey extends Model
     /**
      * Relacionamento com logs de uso de tokens.
      */
-    public function tokenUsageLogs()
-    {
-        return $this->hasMany(TokenUsageLog::class);
-    }
 
     // Métodos de planos removidos - Sistema simplificado v2.4.0
 }

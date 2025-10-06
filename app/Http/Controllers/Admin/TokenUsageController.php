@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\TokenUsageLog;
 use App\Models\ApiKey;
 use App\Models\Request as GPTRequest;
 use Illuminate\Http\Request;
