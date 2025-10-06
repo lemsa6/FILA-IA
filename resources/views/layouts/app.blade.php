@@ -13,6 +13,16 @@
         
         <!-- Tailwind CSS via CDN -->
         <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+            // Suprimir aviso do Tailwind CDN em produção
+            if (typeof tailwind !== 'undefined') {
+                tailwind.config = {
+                    corePlugins: {
+                        preflight: false,
+                    }
+                }
+            }
+        </script>
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])

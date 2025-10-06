@@ -106,20 +106,10 @@
                         </div>
                     </div>
 
-                    <!-- Gráfico de Solicitações por Dia -->
+                    <!-- Métricas Rápidas (sem gráficos duplicados) -->
                     <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
                         <div class="p-6">
-                            <h3 class="text-lg font-bold text-gray-900 mb-4">Solicitações por Dia (Últimos 30 Dias)</h3>
-                            <div class="h-64">
-                                <canvas id="requestsChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Estatísticas de Performance -->
-                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
-                        <div class="p-6">
-                            <h3 class="text-lg font-bold text-gray-900 mb-4">📊 Estatísticas de Performance</h3>
+                            <h3 class="text-lg font-bold text-gray-900 mb-4">📊 Métricas Rápidas</h3>
                             <div class="grid grid-cols-2 gap-4">
                                 <div class="text-center p-4 bg-blue-50 rounded-lg">
                                     <div class="text-2xl font-bold text-blue-600">{{ $performanceStats['avg_processing_time'] ?? 0 }}ms</div>
@@ -129,51 +119,38 @@
                                     <div class="text-2xl font-bold text-green-600">{{ $performanceStats['success_rate'] ?? 0 }}%</div>
                                     <div class="text-sm text-gray-600">Taxa de Sucesso</div>
                                 </div>
-                                <div class="text-center p-4 bg-yellow-50 rounded-lg">
-                                    <div class="text-2xl font-bold text-yellow-600">{{ $performanceStats['cache_hit_rate'] ?? 0 }}%</div>
-                                    <div class="text-sm text-gray-600">Cache Hit Rate</div>
-                                </div>
-                                <div class="text-center p-4 bg-purple-50 rounded-lg">
-                                    <div class="text-2xl font-bold text-purple-600">{{ $performanceStats['successful_requests'] ?? 0 }}</div>
-                                    <div class="text-sm text-gray-600">Req. Completadas</div>
-                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Status das Requisições -->
+                    <!-- 📈 GRÁFICO: Requisições por Hora (Identifica Picos de Uso) -->
                     <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
                         <div class="p-6">
-                            <h3 class="text-lg font-bold text-gray-900 mb-4">🔄 Status das Requisições</h3>
-                            <div class="space-y-3">
-                                <div class="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                                    <div class="flex items-center">
-                                        <div class="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-                                        <span class="font-medium text-gray-700">Completadas</span>
-                                    </div>
-                                    <span class="text-lg font-bold text-green-600">{{ $completedRequests ?? 0 }}</span>
-                                </div>
-                                <div class="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                                    <div class="flex items-center">
-                                        <div class="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
-                                        <span class="font-medium text-gray-700">Em Processamento</span>
-                                    </div>
-                                    <span class="text-lg font-bold text-blue-600">{{ $processingRequests ?? 0 }}</span>
-                                </div>
-                                <div class="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
-                                    <div class="flex items-center">
-                                        <div class="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
-                                        <span class="font-medium text-gray-700">Pendentes</span>
-                                    </div>
-                                    <span class="text-lg font-bold text-yellow-600">{{ ($totalRequests ?? 0) - ($completedRequests ?? 0) - ($failedRequests ?? 0) - ($processingRequests ?? 0) }}</span>
-                                </div>
-                                <div class="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                                    <div class="flex items-center">
-                                        <div class="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
-                                        <span class="font-medium text-gray-700">Falhadas</span>
-                                    </div>
-                                    <span class="text-lg font-bold text-red-600">{{ $failedRequests ?? 0 }}</span>
-                                </div>
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-bold text-gray-900">📈 Requisições por Hora</h3>
+                                <span class="text-sm text-gray-500 bg-blue-50 px-2 py-1 rounded">Últimas 24h</span>
+                            </div>
+                            <div class="h-64">
+                                <canvas id="performanceChart"></canvas>
+                            </div>
+                            <div class="mt-3 text-xs text-gray-500 text-center">
+                                💡 Use este gráfico para identificar picos de uso e planejar recursos
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 🔄 GRÁFICO: Status das Requisições (Monitora Saúde do Sistema) -->
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
+                        <div class="p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-bold text-gray-900">🔄 Status das Requisições</h3>
+                                <span class="text-sm text-gray-500 bg-green-50 px-2 py-1 rounded">Tempo Real</span>
+                            </div>
+                            <div class="h-64">
+                                <canvas id="queueChart"></canvas>
+                            </div>
+                            <div class="mt-3 text-xs text-gray-500 text-center">
+                                💡 Monitore a saúde do sistema - muitas falhas indicam problemas
                             </div>
                         </div>
                     </div>
@@ -299,9 +276,14 @@
                 </div>
             </div>
         </div>
+
     </div>
 
+    <!-- Chart.js Local (UMD) -->
+    <script src="{{ asset('js/chart.umd.js') }}"></script>
+    
     <script>
+        let performanceChart, queueChart;
 
         // Função para atualizar o dashboard
         function refreshDashboard() {
@@ -357,6 +339,144 @@
                 });
         }
 
+        // Função para inicializar gráficos com dados reais
+        function initializeCharts() {
+            // 📈 GRÁFICO 1: Requisições por Hora (últimas 24h) - Para identificar picos de uso
+            const performanceCanvas = document.getElementById('performanceChart');
+            if (!performanceCanvas) {
+                console.error('❌ Canvas performanceChart não encontrado!');
+                return;
+            }
+            const performanceCtx = performanceCanvas.getContext('2d');
+            
+            // Dados reais do backend
+            const requestsPerHour = @json($performanceStats['requests_per_hour'] ?? []);
+            
+            console.log('📊 Dados do gráfico:', requestsPerHour);
+            
+            if (requestsPerHour && requestsPerHour.length > 0) {
+                const labels = requestsPerHour.map(item => String(item.hour).padStart(2, '0') + ':00');
+                const data = requestsPerHour.map(item => item.count);
+                
+                console.log('📈 Labels:', labels);
+                console.log('📈 Data:', data);
+                
+                performanceChart = new Chart(performanceCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Requisições por Hora',
+                            data: data,
+                            borderColor: '#3B82F6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            pointBackgroundColor: '#3B82F6',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2,
+                            pointRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            title: {
+                                display: true,
+                                text: 'Identifique picos de uso e planeje recursos'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                                title: { display: true, text: 'Número de Requisições' }
+                            },
+                            x: {
+                                grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                                title: { display: true, text: 'Hora do Dia' }
+                            }
+                        }
+                    }
+                });
+            } else {
+                // Mostrar mensagem quando não há dados
+                document.getElementById('performanceChart').parentElement.innerHTML = `
+                    <div class="flex items-center justify-center h-64 text-gray-500">
+                        <div class="text-center">
+                            <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            <p class="text-lg font-medium">Nenhuma requisição nas últimas 24h</p>
+                            <p class="text-sm">Faça algumas requisições para ver o padrão de uso</p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 🔄 GRÁFICO 2: Status das Requisições - Para monitorar saúde do sistema
+            const queueCanvas = document.getElementById('queueChart');
+            if (!queueCanvas) {
+                console.error('❌ Canvas queueChart não encontrado!');
+                return;
+            }
+            const queueCtx = queueCanvas.getContext('2d');
+            
+            const statusData = {
+                labels: ['✅ Completadas', '🔄 Processando', '⏳ Pendentes', '❌ Falhadas'],
+                datasets: [{
+                    data: [
+                        @json($completedRequests ?? 0),
+                        @json($processingRequests ?? 0),
+                        @json(($totalRequests ?? 0) - ($completedRequests ?? 0) - ($failedRequests ?? 0) - ($processingRequests ?? 0)),
+                        @json($failedRequests ?? 0)
+                    ],
+                    backgroundColor: [
+                        '#10B981', // Verde - Completadas
+                        '#3B82F6', // Azul - Processando
+                        '#F59E0B', // Amarelo - Pendentes
+                        '#EF4444'  // Vermelho - Falhadas
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            };
+
+            queueChart = new Chart(queueCtx, {
+                type: 'doughnut',
+                data: statusData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                usePointStyle: true
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Monitore a saúde do sistema em tempo real'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         // Função para atualizar estatísticas de tokens
         function updateTokenStats() {
@@ -364,54 +484,10 @@
             // Por enquanto, usa valores estáticos
         }
 
-        // Inicializa gráficos ao carregar a página
+        // Inicializa dashboard ao carregar a página
         document.addEventListener('DOMContentLoaded', function() {
-            // Gráfico de Solicitações por Dia
-            const requestsCtx = document.getElementById('requestsChart').getContext('2d');
-            
-            // Dados reais do backend ou dados de exemplo
-            const requestsData = @json($requestsByDay ?? []);
-            const labels = requestsData.map(item => item.date);
-            const counts = requestsData.map(item => item.count);
-            
-            requestsChart = new Chart(requestsCtx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Requisições',
-                        data: counts,
-                        backgroundColor: 'rgba(234, 179, 8, 0.8)',
-                        borderColor: '#EAB308',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.1)'
-                            }
-                        },
-                        x: {
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.1)'
-                            }
-                        }
-                    }
-                }
-            });
-
-
             updateServiceStatus();
+            initializeCharts();
             
             // Atualiza a cada 30 segundos
             setInterval(updateServiceStatus, 30000);
