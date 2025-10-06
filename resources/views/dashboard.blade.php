@@ -326,11 +326,14 @@
             const requestsPerHour = @json($performanceStats['requests_per_hour'] ?? []);
             
             // DEBUG: Log no console
-            console.log('Dashboard Debug:', {
-                performanceStats: @json($performanceStats),
-                requestsPerHour: requestsPerHour,
-                length: requestsPerHour ? requestsPerHour.length : 'undefined'
-            });
+            console.log('=== DASHBOARD DEBUG ===');
+            console.log('performanceStats:', @json($performanceStats));
+            console.log('requestsPerHour:', requestsPerHour);
+            console.log('totalRequests:', @json($totalRequests ?? 0));
+            console.log('completedRequests:', @json($completedRequests ?? 0));
+            console.log('failedRequests:', @json($failedRequests ?? 0));
+            console.log('processingRequests:', @json($processingRequests ?? 0));
+            console.log('======================');
             
             // Verificar se há dados
             if (!requestsPerHour || requestsPerHour.length === 0) {
@@ -452,17 +455,7 @@
             const performanceCtx = document.getElementById('performanceChart').getContext('2d');
             performanceChart = new Chart(performanceCtx, {
                 type: 'line',
-                data: {
-                    labels: requestsPerHour.map(item => String(item.hour).padStart(2, '0') + ':00'),
-                    datasets: [{
-                        label: 'Requisições por Hora',
-                        data: requestsPerHour.map(item => item.count),
-                        borderColor: '#3B82F6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
+                data: performanceData,
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
