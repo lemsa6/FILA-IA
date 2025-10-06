@@ -186,6 +186,24 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Dados reais do backend
     const monthlyData = @json($monthlyStats);
+    
+    // Verificar se há dados
+    if (monthlyData.length === 0) {
+        // Mostrar mensagem quando não há dados
+        document.getElementById('monthlyChart').parentElement.innerHTML = `
+            <div class="flex items-center justify-center h-64 text-gray-500">
+                <div class="text-center">
+                    <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    <p class="text-lg font-medium">Nenhum dado disponível</p>
+                    <p class="text-sm">Faça algumas requisições para ver os gráficos</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
     const monthLabels = monthlyData.map(item => {
         const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         return months[item.month - 1] + '/' + item.year;
@@ -240,6 +258,24 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Dados reais das APIs
     const apiData = @json($apiStats);
+    
+    // Verificar se há dados
+    if (apiData.length === 0) {
+        // Mostrar mensagem quando não há dados
+        document.getElementById('apiChart').parentElement.innerHTML = `
+            <div class="flex items-center justify-center h-64 text-gray-500">
+                <div class="text-center">
+                    <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                    </svg>
+                    <p class="text-lg font-medium">Nenhuma API utilizada</p>
+                    <p class="text-sm">Crie chaves de API e faça requisições</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
     const apiLabels = apiData.map(item => item.api_key ? item.api_key.name : 'API #' + item.api_key_id);
     const apiCosts = apiData.map(item => parseFloat(item.cost_brl || 0));
     const apiRequests = apiData.map(item => item.requests || 0);
