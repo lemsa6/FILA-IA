@@ -326,7 +326,7 @@
             const requestsPerHour = @json($performanceStats['requests_per_hour'] ?? []);
             
             // Verificar se há dados
-            if (requestsPerHour.length === 0) {
+            if (!requestsPerHour || requestsPerHour.length === 0) {
                 // Mostrar mensagem quando não há dados
                 const performanceChartElement = document.getElementById('performanceChart');
                 if (performanceChartElement) {
@@ -346,7 +346,7 @@
             }
             
             const performanceData = {
-                labels: requestsPerHour.map(item => str_pad(item.hour, 2, '0', STR_PAD_LEFT) + ':00'),
+                labels: requestsPerHour.map(item => String(item.hour).padStart(2, '0') + ':00'),
                 datasets: [{
                     label: 'Requisições por Hora',
                     data: requestsPerHour.map(item => item.count),
@@ -440,7 +440,7 @@
             performanceChart = new Chart(performanceCtx, {
                 type: 'line',
                 data: {
-                    labels: requestsPerHour.map(item => str_pad(item.hour, 2, '0', STR_PAD_LEFT) + ':00'),
+                    labels: requestsPerHour.map(item => String(item.hour).padStart(2, '0') + ':00'),
                     datasets: [{
                         label: 'Requisições por Hora',
                         data: requestsPerHour.map(item => item.count),
