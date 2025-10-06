@@ -2,6 +2,38 @@
 
 Todas as mudanças notáveis deste projeto serão documentadas neste arquivo.
 
+## [1.3.0] - 2025-10-06 📊 DASHBOARD 100% FUNCIONAL
+
+### 🚀 Adicionado
+- Status em tempo real do sistema (GPT, Redis, Database)
+- JavaScript dinâmico para atualização de indicadores
+- Performance real das requisições com microtime()
+- Cache GPT com medição real de hits/misses
+
+### 🔧 Melhorado
+- RoutinesController usando GPTRequest em vez de OllamaRequest
+- Modelo configurado dinamicamente via ENV
+- Status indicators funcionais com cores dinâmicas
+- Botão "Atualizar Status" totalmente funcional
+
+### 🗑️ Removido
+- Model OllamaRequest obsoleto
+- Command TestOllamaApi não utilizado
+- Referências hardcoded ao modelo qwen2.5vl:7b
+- Variáveis quebradas ($ollamaHealthy)
+
+### 🐛 Corrigido
+- Status das filas agora usa dados reais do GPTRequest
+- Performance das requisições com medição precisa
+- TestJob corrigido para usar fila 'gpt-requests'
+- Imports quebrados no Console/Kernel.php
+
+### 💡 Funcionalidades
+- Dashboard 100% funcional com dados reais
+- Sistema de monitoramento em tempo real
+- Performance e cache totalmente operacionais
+- Zero dados hardcoded ou quebrados
+
 ## [1.2.0] - 2025-10-06 🧹 SISTEMA LIMPO E OTIMIZADO
 
 ### 🚀 Adicionado

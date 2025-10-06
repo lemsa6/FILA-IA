@@ -19,7 +19,7 @@ class TestJob implements ShouldQueue
      */
     public function __construct()
     {
-        $this->onQueue('ollama-requests');
+        $this->onQueue('gpt-requests');
     }
 
     /**

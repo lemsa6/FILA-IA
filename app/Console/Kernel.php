@@ -3,8 +3,9 @@
 namespace App\Console;
 
 use App\Console\Commands\CleanupLogs;
+use App\Console\Commands\CleanupSessions;
 use App\Console\Commands\GenerateApiKey;
-use App\Console\Commands\TestOllamaApi;
+use App\Console\Commands\TestIntelligentCache;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -18,7 +19,6 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         GenerateApiKey::class,
         CleanupLogs::class,
-        TestOllamaApi::class,
         CleanupSessions::class,
         TestIntelligentCache::class,
     ];
@@ -34,7 +34,7 @@ class Kernel extends ConsoleKernel
             ->at('01:00')
             ->appendOutputTo(storage_path('logs/scheduler.log'));
             
-        // Verifica a saúde do serviço Ollama a cada 5 minutos
+        // Verifica a saúde do serviço OpenAI GPT a cada 5 minutos
         $schedule->call(function () {
             app(\App\Services\IAService::class)->healthCheck();
         })->everyFiveMinutes();

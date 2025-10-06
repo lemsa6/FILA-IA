@@ -208,7 +208,7 @@ class RoutinesController extends Controller
             $iaService = app(IAService::class);
             $clientContextService = app(ClientContextService::class);
 
-            // 1. Status do Ollama
+            // 1. Status da IA (OpenAI GPT)
             $iaHealthy = $iaService->healthCheck();
             
             // 2. Status do Redis
@@ -220,16 +220,16 @@ class RoutinesController extends Controller
             // 4. Estatísticas gerais
             $stats = $this->getSystemStats();
 
-            $overallHealth = $ollamaHealthy && $redisHealthy && $dbHealthy;
+            $overallHealth = $iaHealthy && $redisHealthy && $dbHealthy;
 
             return response()->json([
                 'success' => true,
                 'overall_health' => $overallHealth,
                 'services' => [
-                    'ollama' => [
-                        'healthy' => $ollamaHealthy,
-                        'model' => config('services.ollama.model'),
-                        'url' => config('services.ollama.url')
+                    'gpt' => [
+                        'healthy' => $iaHealthy,
+                        'model' => config('services.openai.model', 'gpt-4.1-nano'),
+                        'url' => 'https://api.openai.com/v1'
                     ],
                     'redis' => [
                         'healthy' => $redisHealthy,
@@ -343,10 +343,10 @@ class RoutinesController extends Controller
     protected function getSystemStats(): array
     {
         try {
-            $totalRequests = OllamaRequest::count();
-            $pendingRequests = OllamaRequest::where('status', 'pending')->count();
-            $completedRequests = OllamaRequest::where('status', 'completed')->count();
-            $failedRequests = OllamaRequest::where('status', 'failed')->count();
+            $totalRequests = GPTRequest::count();
+            $pendingRequests = GPTRequest::where('status', 'pending')->count();
+            $completedRequests = GPTRequest::where('status', 'completed')->count();
+            $failedRequests = GPTRequest::where('status', 'failed')->count();
             
             $totalApiKeys = ApiKey::count();
             $activeApiKeys = ApiKey::where('status', 'active')->count();

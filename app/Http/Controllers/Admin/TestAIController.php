@@ -61,7 +61,7 @@ class TestAIController extends Controller
             Log::info('Teste de IA executado com sucesso', [
                 'user_id' => auth()->id(),
                 'question' => $randomQuestion,
-                'model' => config('services.ollama.model')
+                'model' => config('services.openai.model', 'gpt-4.1-nano')
             ]);
 
             return response()->json([
