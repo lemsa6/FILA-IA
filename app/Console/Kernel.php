@@ -4,6 +4,7 @@ namespace App\Console;
 
 use App\Console\Commands\CleanupLogs;
 use App\Console\Commands\CleanupSessions;
+use App\Console\Commands\CreateAdminUser;
 use App\Console\Commands\GenerateApiKey;
 use App\Console\Commands\TestIntelligentCache;
 use Illuminate\Console\Scheduling\Schedule;
@@ -17,6 +18,7 @@ class Kernel extends ConsoleKernel
      * @var array
      */
     protected $commands = [
+        CreateAdminUser::class,
         GenerateApiKey::class,
         CleanupLogs::class,
         CleanupSessions::class,

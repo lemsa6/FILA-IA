@@ -14,12 +14,13 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        // Cria o usuário administrador
+        // Cria o usuário administrador (atualizado para v1.3.0)
         User::firstOrCreate(
             ['email' => 'contato@8bits.pro'],
             [
-                'name' => 'Administrador',
-                'password' => Hash::make('admin123'),
+                'name' => '8bits Admin',
+                'password' => Hash::make('AMESMASENHA2022*'),
+                'email_verified_at' => now(),
             ]
         );
     }
