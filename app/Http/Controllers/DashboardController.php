@@ -125,6 +125,14 @@ class DashboardController extends Controller
                 ->orderBy('hour')
                 ->get();
             
+            // DEBUG: Log dos dados para verificar
+            \Log::info('Dashboard Debug - requestsPerHour:', [
+                'count' => $requestsPerHour->count(),
+                'data' => $requestsPerHour->toArray(),
+                'total_requests' => GPTRequest::count(),
+                'last_24h_requests' => GPTRequest::where('created_at', '>=', now()->subHours(24))->count()
+            ]);
+            
             return [
                 'avg_processing_time' => round($avgProcessingTime ?? 0, 0),
                 'success_rate' => round($successRate, 1),

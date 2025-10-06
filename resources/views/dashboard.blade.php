@@ -325,6 +325,13 @@
             // Dados REAIS do backend
             const requestsPerHour = @json($performanceStats['requests_per_hour'] ?? []);
             
+            // DEBUG: Log no console
+            console.log('Dashboard Debug:', {
+                performanceStats: @json($performanceStats),
+                requestsPerHour: requestsPerHour,
+                length: requestsPerHour ? requestsPerHour.length : 'undefined'
+            });
+            
             // Verificar se há dados
             if (!requestsPerHour || requestsPerHour.length === 0) {
                 // Mostrar mensagem quando não há dados
