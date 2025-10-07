@@ -198,4 +198,82 @@ class TokenUsageController extends Controller
             'warningAlerts'
         ));
     }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show(string $id)
+    {
+        // Buscar o request específico
+        $request = GPTRequest::with(['apiKey'])->findOrFail($id);
+        
+        return view('admin.token-usage.show', compact('request'));
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(string $id)
+    {
+        // Buscar o request específico
+        $request = GPTRequest::with(['apiKey'])->findOrFail($id);
+        
+        return view('admin.token-usage.edit', compact('request'));
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, string $id)
+    {
+        // Buscar o request específico
+        $gptRequest = GPTRequest::findOrFail($id);
+        
+        // Validar dados
+        $validated = $request->validate([
+            'status' => 'sometimes|in:pending,processing,completed,failed',
+            'priority' => 'sometimes|integer|min:0|max:10',
+        ]);
+        
+        // Atualizar
+        $gptRequest->update($validated);
+        
+        return redirect()->route('admin.token-usage.show', $id)
+                        ->with('success', 'Requisição atualizada com sucesso!');
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(string $id)
+    {
+        // Buscar e deletar o request
+        $request = GPTRequest::findOrFail($id);
+        $request->delete();
+        
+        return redirect()->route('admin.token-usage.index')
+                        ->with('success', 'Requisição removida com sucesso!');
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+        // Para token usage, não faz sentido criar manualmente
+        // Redirecionar para o índice
+        return redirect()->route('admin.token-usage.index')
+                        ->with('info', 'Os registros de uso de tokens são criados automaticamente.');
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request)
+    {
+        // Para token usage, não faz sentido criar manualmente
+        // Redirecionar para o índice
+        return redirect()->route('admin.token-usage.index')
+                        ->with('info', 'Os registros de uso de tokens são criados automaticamente.');
+    }
 }
