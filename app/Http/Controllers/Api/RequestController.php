@@ -58,16 +58,29 @@ class RequestController extends Controller
 
     /**
      * Store a newly created resource in storage.
+     *
+     * Aceita dois modos de operação:
+     *   - Modo simples:  { prompt, session_id, parameters, metadata }
+     *   - Modo avançado: { messages, tools, parameters, metadata }
+     *     messages[] segue o formato OpenAI (role + content).
+     *     tools[]    é a lista de function definitions (formato OpenAI).
+     *     Quando messages está presente, o prompt é ignorado.
      */
     public function store(Request $request)
     {
         // Validação
         $validated = $request->validate([
-            'prompt' => 'required|string|max:10000',
+            'prompt'     => 'sometimes|string|max:10000',
+            'messages'   => 'sometimes|array',
+            'tools'      => 'sometimes|array',
             'parameters' => 'sometimes|array',
-            'metadata' => 'sometimes|array',
-            'session_id' => 'sometimes|string|max:255', // ID da sessão para contexto
+            'metadata'   => 'sometimes|array',
+            'session_id' => 'sometimes|string|max:255',
         ]);
+
+        if (empty($validated['prompt']) && empty($validated['messages'])) {
+            return response()->json(['error' => 'Campo prompt ou messages é obrigatório'], 422);
+        }
 
         // Cria a requisição
         $gptRequest = new GPTRequest();

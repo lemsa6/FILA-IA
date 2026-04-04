@@ -62,70 +62,92 @@ class IAService
     }
 
     /**
-     * Envia uma requisição para a IA (OpenAI GPT-5) com isolamento por cliente
+     * Envia uma requisição para a IA (OpenAI) com isolamento por cliente.
      *
-     * @param string $prompt
-     * @param array $parameters
-     * @param string $apiKeyId ID da chave API para isolamento
-     * @param string|null $sessionId ID da sessão para contexto
-     * @return array
-     * @throws Exception
+     * Dois modos de operação:
+     *   - Modo simples:  $prompt fornecido — constrói messages internamente com histórico de sessão.
+     *   - Modo avançado: $messages fornecido — usa o array diretamente (tool calling multi-turno).
+     *     Neste modo o cache de prompt é desabilitado pois as mensagens já incluem resultados
+     *     de tools e não devem ser reutilizadas entre chamadas.
+     *
+     * @param string     $prompt     Texto do usuário (modo simples)
+     * @param array      $parameters Parâmetros de geração (temperature, max_tokens)
+     * @param string     $apiKeyId   ID da chave API para isolamento por cliente
+     * @param string|null $sessionId ID da sessão para histórico (modo simples)
+     * @param array|null  $messages  Array de mensagens OpenAI (modo avançado, sobrescreve prompt)
+     * @param array       $tools     Definições de tools para function calling
      */
-    public function generateCompletion(string $prompt, array $parameters = [], string $apiKeyId = null, ?string $sessionId = null)
-    {
-        // Gera chaves únicas para este cliente
-        $promptHash = md5($prompt . json_encode($parameters));
-        $clientCacheKey = "gpt:client_{$apiKeyId}:prompt_{$promptHash}";
-        $clientContextKey = "gpt:client_{$apiKeyId}:context_{$sessionId}";
-        
-        // Verifica cache do cliente primeiro (otimizado)
-        $cachedResponse = Cache::get($clientCacheKey);
-        if ($cachedResponse) {
-            // Adiciona flag de cache hit para otimização de logs
-            $cachedResponse['_cache_hit'] = true;
-            return $cachedResponse;
+    public function generateCompletion(
+        string $prompt,
+        array $parameters = [],
+        string $apiKeyId = null,
+        ?string $sessionId = null,
+        ?array $messages = null,
+        array $tools = []
+    ) {
+        $useAdvancedMode = !empty($messages);
+
+        // Cache de prompt apenas no modo simples (sem tools)
+        $clientCacheKey = null;
+        if (!$useAdvancedMode && empty($tools)) {
+            $promptHash = md5($prompt . json_encode($parameters));
+            $clientCacheKey = "gpt:client_{$apiKeyId}:prompt_{$promptHash}";
+
+            $cachedResponse = Cache::get($clientCacheKey);
+            if ($cachedResponse) {
+                $cachedResponse['_cache_hit'] = true;
+                return $cachedResponse;
+            }
         }
 
-        return $this->circuitBreaker->execute(
-            function () use ($prompt, $parameters, $apiKeyId, $sessionId, $clientCacheKey, $clientContextKey) {
-                // Obtém contexto do cliente se existir
-                $clientContext = Cache::get($clientContextKey, []);
-                $conversationHistory = $clientContext['history'] ?? [];
-                
-                // Converte histórico para formato OpenAI messages
-                $messages = $this->buildOpenAIMessages($prompt, $conversationHistory);
-                
-                // Prepara parâmetros OpenAI com compatibilidade para GPT-5
-                $defaultParams = $this->buildOpenAIParams($parameters, $messages);
+        $clientContextKey = "gpt:client_{$apiKeyId}:context_{$sessionId}";
 
-                // Remove parâmetros que já foram processados e garante que seja array
-                $parametersArray = is_array($parameters) ? $parameters : $parameters->toArray();
+        return $this->circuitBreaker->execute(
+            function () use ($prompt, $parameters, $apiKeyId, $sessionId, $clientCacheKey, $clientContextKey, $messages, $tools, $useAdvancedMode) {
+                if ($useAdvancedMode) {
+                    // Modo avançado: usa messages diretamente, sem histórico interno
+                    $openaiMessages = $messages;
+                } else {
+                    // Modo simples: constrói messages a partir do prompt + histórico de sessão
+                    $clientContext = Cache::get($clientContextKey, []);
+                    $conversationHistory = $clientContext['history'] ?? [];
+                    $openaiMessages = $this->buildOpenAIMessages($prompt, $conversationHistory);
+                }
+
+                // Prepara parâmetros OpenAI
+                $defaultParams = $this->buildOpenAIParams($parameters, $openaiMessages, $tools);
+
+                // Mescla parâmetros extras (sem sobrescrever os já processados)
+                $parametersArray = is_array($parameters) ? $parameters : [];
                 $filteredParams = array_diff_key($parametersArray, ['temperature' => '', 'max_tokens' => '']);
                 $params = array_merge($defaultParams, $filteredParams);
 
                 $response = Http::withHeaders([
                     'Authorization' => 'Bearer ' . $this->apiKey,
                     'Content-Type' => 'application/json'
-                ])->timeout(15)->post($this->apiUrl . '/chat/completions', $params);
+                ])->timeout(30)->post($this->apiUrl . '/chat/completions', $params);
 
                 if ($response->successful()) {
                     $openaiResult = $response->json();
-                    
-                    // Converte resposta OpenAI para formato compatível
+
                     $result = $this->convertOpenAIResponse($openaiResult);
-                    
-                    // Atualiza contexto do cliente
-                    $this->updateClientContext($clientContextKey, $prompt, $result, $conversationHistory);
-                    
-                    // Salva no cache do cliente
-                    Cache::put($clientCacheKey, $result, config('services.openai.cache.ttl', 3600));
-                    
-                    // Se estava em fallback, reseta o circuit breaker
+
+                    // Atualiza contexto de sessão apenas no modo simples
+                    if (!$useAdvancedMode) {
+                        $clientContext = Cache::get($clientContextKey, []);
+                        $this->updateClientContext($clientContextKey, $prompt, $result, $clientContext['history'] ?? []);
+                    }
+
+                    // Cache de prompt apenas para respostas simples (não tool_calls)
+                    if ($clientCacheKey && ($result['finish_reason'] ?? 'stop') !== 'tool_calls') {
+                        Cache::put($clientCacheKey, $result, config('services.openai.cache.ttl', 3600));
+                    }
+
                     if (Cache::get("circuit_breaker:gpt:state") === 'open') {
                         $this->circuitBreaker->reset();
-                        Log::info('Serviço OpenAI ChatGPT recuperado, circuit breaker resetado automaticamente');
+                        Log::info('Serviço OpenAI recuperado, circuit breaker resetado automaticamente');
                     }
-                    
+
                     return $result;
                 }
 
@@ -170,7 +192,7 @@ class IAService
                         $response = Http::withHeaders([
                             'Authorization' => 'Bearer ' . $this->apiKey,
                             'Content-Type' => 'application/json'
-                        ])->timeout(15)->post($this->apiUrl . '/chat/completions', $fallbackParams);
+                        ])->timeout(12)->post($this->apiUrl . '/chat/completions', $fallbackParams);
                         
                         if ($response->successful()) {
                             $openaiResult = $response->json();
@@ -219,18 +241,19 @@ class IAService
             'content' => 'Você é um assistente inteligente e útil. Responda de forma clara e precisa.'
         ];
         
-        // Adiciona histórico da conversa (limitado e otimizado)
+        // Adiciona histórico da conversa — últimas 3 trocas (6 mensagens)
+        // Manter menos contexto reduz tokens enviados e acelera a resposta da OpenAI
         if (!empty($conversationHistory)) {
-            $recentHistory = array_slice($conversationHistory, -5); // Reduzido para 5 interações
+            $recentHistory = array_slice($conversationHistory, -3);
             
             foreach ($recentHistory as $interaction) {
-                // Limita tamanho das mensagens para evitar overhead
-                $userContent = strlen($interaction['prompt']) > 500 ? 
-                    substr($interaction['prompt'], 0, 500) . '...' : 
+                // Trunca mensagens grandes para reduzir tokens
+                $userContent = strlen($interaction['prompt']) > 300 ? 
+                    substr($interaction['prompt'], 0, 300) . '...' : 
                     $interaction['prompt'];
                     
-                $assistantContent = strlen($interaction['response']) > 1000 ? 
-                    substr($interaction['response'], 0, 1000) . '...' : 
+                $assistantContent = strlen($interaction['response']) > 600 ? 
+                    substr($interaction['response'], 0, 600) . '...' : 
                     $interaction['response'];
                 
                 $messages[] = [
@@ -254,28 +277,41 @@ class IAService
     }
 
     /**
-     * Converte resposta OpenAI para formato compatível com Ollama
+     * Converte resposta OpenAI para formato interno.
      *
-     * @param string $prompt
-     * @param array $conversationHistory
-     * @return array
+     * Dois casos:
+     *   finish_reason = "tool_calls" → retorna tool_calls para execução pelo cliente (WP-COMPLETO).
+     *   finish_reason = "stop"       → retorna resposta textual final.
      */
     public function convertOpenAIResponse(array $openaiResponse): array
     {
-        $choice = $openaiResponse['choices'][0] ?? [];
-        $usage = $openaiResponse['usage'] ?? [];
-        
-        return [
-            'model' => $openaiResponse['model'] ?? $this->model,
-            'response' => $choice['message']['content'] ?? 'Resposta não disponível',
-            'done' => true,
-            'created_at' => now()->toIso8601String(),
-            'tokens_input' => $usage['prompt_tokens'] ?? null,
+        $choice       = $openaiResponse['choices'][0] ?? [];
+        $usage        = $openaiResponse['usage'] ?? [];
+        $finishReason = $choice['finish_reason'] ?? 'stop';
+        $message      = $choice['message'] ?? [];
+
+        $base = [
+            'model'         => $openaiResponse['model'] ?? $this->model,
+            'finish_reason' => $finishReason,
+            'done'          => $finishReason !== 'tool_calls',
+            'created_at'    => now()->toIso8601String(),
+            'tokens_input'  => $usage['prompt_tokens'] ?? null,
             'tokens_output' => $usage['completion_tokens'] ?? null,
-            'total_tokens' => $usage['total_tokens'] ?? null,
-            '_openai_id' => $openaiResponse['id'] ?? null,
-            '_openai_object' => $openaiResponse['object'] ?? null,
+            'total_tokens'  => $usage['total_tokens'] ?? null,
+            '_openai_id'    => $openaiResponse['id'] ?? null,
         ];
+
+        if ($finishReason === 'tool_calls') {
+            // Retorna as tool_calls e a mensagem completa do assistente para o cliente
+            // montar o próximo turno (role=assistant + role=tool)
+            $base['response']          = null;
+            $base['tool_calls']        = $message['tool_calls'] ?? [];
+            $base['assistant_message'] = $message; // mensagem completa para reinjetar no array
+        } else {
+            $base['response'] = $message['content'] ?? 'Resposta não disponível';
+        }
+
+        return $base;
     }
 
     /**
@@ -364,36 +400,36 @@ class IAService
     }
 
     /**
-     * Constrói parâmetros OpenAI com compatibilidade para diferentes modelos
+     * Constrói parâmetros OpenAI com compatibilidade para diferentes modelos.
      *
-     * @param array $parameters
-     * @param array $messages
-     * @return array
+     * @param array $parameters Parâmetros de geração (temperature, max_tokens)
+     * @param array $messages   Array de mensagens no formato OpenAI
+     * @param array $tools      Definições de tools para function calling (opcional)
      */
-    public function buildOpenAIParams(array $parameters, array $messages): array
+    public function buildOpenAIParams(array $parameters, array $messages, array $tools = []): array
     {
-        // Garantir que o modelo seja uma string válida
         $model = is_array($this->model) ? 'gpt-4.1-nano' : $this->model;
-        
+
         $baseParams = [
-            'model' => $model,
+            'model'    => $model,
             'messages' => $messages,
-            'stream' => false,
+            'stream'   => false,
         ];
 
-        // Detecta se é um modelo GPT-5
         $isGpt5Model = is_string($model) && str_contains($model, 'gpt-5');
-        
+
         if ($isGpt5Model) {
-            // GPT-5 usa max_completion_tokens e precisa de mais espaço para raciocinar
-            $baseParams['max_tokens'] = $parameters['max_tokens'] ?? $parameters['max_completion_tokens'] ?? 1024;
-            
-            // Garante que temperatura seja float
+            $baseParams['max_tokens']  = $parameters['max_tokens'] ?? $parameters['max_completion_tokens'] ?? 1024;
             $baseParams['temperature'] = (float) ($parameters['temperature'] ?? 0.7);
         } else {
-            // GPT-3.5-turbo e outros modelos suportam todos os parâmetros padrão
             $baseParams['temperature'] = (float) ($parameters['temperature'] ?? 0.7);
-            $baseParams['max_tokens'] = (int) ($parameters['max_tokens'] ?? 1000);
+            $baseParams['max_tokens']  = (int) ($parameters['max_tokens'] ?? 600);
+        }
+
+        // Adiciona tools quando fornecidas (ativa function calling nativo)
+        if (!empty($tools)) {
+            $baseParams['tools']       = $tools;
+            $baseParams['tool_choice'] = 'auto';
         }
 
         return $baseParams;

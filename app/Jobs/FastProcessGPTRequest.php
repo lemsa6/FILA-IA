@@ -17,8 +17,8 @@ class FastProcessGPTRequest implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 2; // Reduzido de 3 para 2
-    public $timeout = 20; // Reduzido de 25 para 20s
+    public $tries = 2;
+    public $timeout = 18; // HTTP timeout é 12s + 6s de margem para processamento
     public $maxExceptions = 2;
 
     protected GPTRequest $request;
@@ -42,10 +42,13 @@ class FastProcessGPTRequest implements ShouldQueue
                 $this->getPromptFromRequest(),
                 $this->getParametersFromRequest(),
                 $this->request->api_key_id,
-                $this->request->session_id ?? null
+                $this->request->session_id ?? null,
+                $this->getMessagesFromRequest(),
+                $this->getToolsFromRequest()
             );
 
-            if (!$result || !isset($result['response'])) {
+            // Válido tanto para resposta textual (response) quanto para tool calling (tool_calls)
+            if (!$result || (!isset($result['response']) && !isset($result['tool_calls']))) {
                 throw new Exception('Resposta inválida da IA');
             }
 
@@ -176,6 +179,24 @@ class FastProcessGPTRequest implements ShouldQueue
     private function getParametersFromRequest(): array
     {
         return $this->request->parameters ?? [];
+    }
+
+    /**
+     * Extract messages array (modo avançado — sobrescreve prompt quando presente)
+     */
+    private function getMessagesFromRequest(): ?array
+    {
+        $content = json_decode($this->request->content, true);
+        return $content['messages'] ?? null;
+    }
+
+    /**
+     * Extract tools array for function calling
+     */
+    private function getToolsFromRequest(): array
+    {
+        $content = json_decode($this->request->content, true);
+        return $content['tools'] ?? [];
     }
 
     /**

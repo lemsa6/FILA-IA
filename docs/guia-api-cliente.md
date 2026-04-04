@@ -43,7 +43,18 @@ POST https://fila.8bits.app.br/api/v1/authenticate
 
 ## Envio de Requisições para a IA
 
-### Criar Nova Requisição
+A API suporta dois modos de operação para o endpoint `POST /requests`:
+
+| Modo | Quando usar | Campo principal |
+|---|---|---|
+| **Simples** | Conversa direta sem tools | `prompt` (string) |
+| **Avançado** | Tool calling / multi-turno | `messages` (array OpenAI) + `tools` (opcional) |
+
+> **Regra:** `prompt` OU `messages` deve estar presente. Se ambos estiverem ausentes, a API retorna `422`.
+
+---
+
+### Modo simples — Criar requisição com `prompt`
 
 ```
 POST https://fila.8bits.app.br/api/v1/requests
@@ -60,7 +71,7 @@ POST https://fila.8bits.app.br/api/v1/requests
   "session_id": "id_opcional_da_sessao",
   "parameters": {
     "temperature": 0.7,
-    "max_tokens": 100
+    "max_tokens": 500
   },
   "metadata": {
     "user_id": "id_opcional",
@@ -70,23 +81,127 @@ POST https://fila.8bits.app.br/api/v1/requests
 ```
 
 **Parâmetros:**
-- `prompt` (obrigatório): O texto que será enviado para o modelo OpenAI ChatGPT
-- `session_id` (opcional): ID de sessão para manter contexto entre requisições
-- `parameters` (opcional): Configurações para o modelo de IA
-  - `temperature`: Controla a aleatoriedade das respostas (0.0 a 1.0)
-  - `max_tokens`: Limite máximo de tokens na resposta
-- `metadata` (opcional): Dados adicionais para rastreamento
+- `prompt` *(obrigatório neste modo)*: texto enviado para o modelo
+- `session_id` *(opcional)*: mantém histórico de contexto entre requisições da mesma sessão
+- `parameters` *(opcional)*: configurações do modelo (`temperature`, `max_tokens`)
+- `metadata` *(opcional)*: dados de rastreamento livres
 
-**Resposta de Sucesso (202):**
+---
+
+### Modo avançado — Tool calling com `messages` e `tools`
+
+Usado para function calling nativo da OpenAI (ex.: agendamento, consulta de dados, transferências).
+O cliente é responsável por executar as tools localmente e reenviar os resultados.
+
+**Corpo da Requisição — Round 1 (pergunta com tools):**
+```json
+{
+  "messages": [
+    { "role": "system",    "content": "Você é um assistente de agendamentos." },
+    { "role": "user",      "content": "Quais horários estão disponíveis esta semana?" }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_available_slots",
+        "description": "Busca horários disponíveis no calendário.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "days_ahead": { "type": "integer", "description": "Dias à frente (padrão: 7)" }
+          }
+        }
+      }
+    }
+  ],
+  "parameters": { "temperature": 0.7, "max_tokens": 500 }
+}
+```
+
+**Parâmetros adicionais (modo avançado):**
+- `messages` *(obrigatório neste modo)*: array de mensagens no formato OpenAI (`role` + `content`)
+- `tools` *(opcional)*: lista de function definitions — ativa function calling nativo quando presente
+
+**Resposta quando a IA solicita uma tool (202 → polling → completed):**
 ```json
 {
   "id": "uuid-da-requisicao",
-  "status": "pending",
-  "created_at": "2025-07-01T10:00:00Z",
-  "session_id": "id_da_sessao",
-  "message": "Requisição enviada para processamento. Use o ID para consultar o status."
+  "status": "completed",
+  "result": {
+    "finish_reason": "tool_calls",
+    "tool_calls": [
+      {
+        "id": "call_abc123",
+        "type": "function",
+        "function": {
+          "name": "get_available_slots",
+          "arguments": "{\"days_ahead\": 7}"
+        }
+      }
+    ],
+    "assistant_message": {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [...]
+    },
+    "response": null,
+    "tokens_input": 420,
+    "tokens_output": 35,
+    "model": "gpt-4.1-nano",
+    "done": false
+  },
+  "processing_time": 980,
+  "completed_at": "2026-04-04T10:00:01Z"
 }
 ```
+
+> Quando `finish_reason = "tool_calls"`, o cliente deve:
+> 1. Executar localmente cada tool em `tool_calls[]`
+> 2. Adicionar ao array `messages`: a `assistant_message` recebida + uma mensagem `role: "tool"` por tool executada
+> 3. Reenviar via `POST /requests` (sem `tools` no segundo round)
+
+**Corpo da Requisição — Round 2 (devolvendo resultados das tools):**
+```json
+{
+  "messages": [
+    { "role": "system",    "content": "Você é um assistente de agendamentos." },
+    { "role": "user",      "content": "Quais horários estão disponíveis esta semana?" },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [{ "id": "call_abc123", "type": "function", "function": { "name": "get_available_slots", "arguments": "{}" } }]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_abc123",
+      "content": "Horários disponíveis:\n- Segunda 09:00\n- Terça 14:00\n- Quinta 10:30"
+    }
+  ],
+  "parameters": { "temperature": 0.7, "max_tokens": 500 }
+}
+```
+
+**Resposta final (texto para o usuário):**
+```json
+{
+  "id": "uuid-da-requisicao-2",
+  "status": "completed",
+  "result": {
+    "finish_reason": "stop",
+    "response": "Temos os seguintes horários disponíveis esta semana: Segunda às 09h, Terça às 14h e Quinta às 10h30. Qual prefere?",
+    "tool_calls": null,
+    "tokens_input": 510,
+    "tokens_output": 62,
+    "model": "gpt-4.1-nano",
+    "done": true
+  },
+  "processing_time": 1150,
+  "completed_at": "2026-04-04T10:00:03Z"
+}
+```
+
+---
 
 ### Verificar Status de uma Requisição
 
@@ -106,20 +221,18 @@ GET https://fila.8bits.app.br/api/v1/requests/{id}
 }
 ```
 
-**Resposta para Requisição Concluída:**
+**Resposta para Requisição Concluída (texto simples):**
 ```json
 {
   "id": "uuid-da-requisicao",
   "status": "completed",
   "result": {
+    "finish_reason": "stop",
     "response": "Resposta da IA aqui",
     "model": "gpt-4.1-nano",
     "tokens_input": 15,
     "tokens_output": 42,
-    "metadata": {
-      "user_id": "id_opcional",
-      "context": "informação adicional opcional"
-    }
+    "done": true
   },
   "processing_time": 1250,
   "completed_at": "2025-07-01T10:00:02Z"
