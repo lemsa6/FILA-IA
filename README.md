@@ -1,107 +1,166 @@
 # FILA-IA
 
-Sistema de filas inteligente para processamento de requisições GPT com Laravel Horizon e Redis.
+Intermediário inteligente entre sistemas Laravel e a API OpenAI. Gerencia filas de requisições, autenticação por chave de API, cache de contexto por cliente, tracking de tokens/custos e suporte a **tool calling nativo** (function calling da OpenAI).
 
-## 🚀 Versão 1.3.0
+## Versão 1.5.0
 
-### ✨ Funcionalidades
+### Funcionalidades
 
-- **💰 Sistema de Custos**: Cálculo automático de custos USD/BRL por token
-- **📊 Estatísticas Reais**: Dashboards com dados reais e gráficos dinâmicos
-- **🔒 Segurança Avançada**: Rate limiting, auditoria e validação de API keys
-- **⚡ Performance Otimizada**: 3-5s por requisição, cache inteligente
-- **📈 Monitoramento**: Horizon dashboard, logs e métricas detalhadas
-- **🐳 Docker**: Containerização completa com Nginx otimizado
+- **Fila assíncrona**: Requisições processadas via Laravel Horizon + Redis
+- **Isolamento por cliente**: Contexto, cache e billing separados por `api_key_id`
+- **Tool calling nativo**: Suporte completo a `tools[]` e `messages[]` no formato OpenAI
+- **Tracking de custos**: Cálculo automático USD/BRL por token (input + output)
+- **Cache de prompt**: Respostas idênticas reutilizadas (desativado para tool calls)
+- **Circuit breaker**: Fallback automático em caso de indisponibilidade da OpenAI
+- **Estatísticas por cliente**: Tokens diários, mensais e totais via Redis
 
-### 🏗️ Arquitetura
+### Arquitetura
 
-- **Backend**: Laravel 10
+```
+Cliente (ex: WP-COMPLETO)
+    │
+    ├── POST /api/v1/requests  { prompt } ou { messages, tools }
+    │         ↓
+    │   RequestController → FastProcessGPTRequest (job)
+    │         ↓
+    │   IAService → OpenAI API (gpt-4.1-nano)
+    │         ↓
+    │   resultado salvo no DB
+    │
+    └── GET /api/v1/requests/{id}  ← polling até status = completed
+```
+
+- **Backend**: Laravel 11 · PHP 8.2+
 - **Filas**: Redis + Laravel Horizon
-- **Banco**: MySQL
+- **Banco**: MySQL 8.0+
 - **Cache**: Redis
-- **Container**: Docker + Docker Compose
 
-### 📋 Requisitos
+### Requisitos
 
-- Docker
-- Docker Compose
-- PHP 8.1+
+- PHP 8.2+
 - MySQL 8.0+
 - Redis 6.0+
+- Conta OpenAI com API Key
 
-### 🚀 Instalação
+### Instalação
 
 ```bash
-# Clone o repositório
 git clone https://github.com/lemsa6/FILA-IA.git
 cd FILA-IA
 
-# Inicie os containers
-docker-compose up -d
+cp .env.example .env
+# Preencha OPENAI_API_KEY, DB_*, REDIS_HOST no .env
 
-# Execute as migrações
-docker exec fila-api php artisan migrate
+composer install
+php artisan key:generate
+php artisan migrate
 
-# Inicie o Horizon
-docker exec fila-api php artisan horizon
+# Inicia o worker de filas
+php artisan horizon
 ```
 
-### 📊 Monitoramento
-
-- **Horizon Dashboard**: http://localhost:8000/horizon
-- **Logs**: `storage/logs/laravel.log`
-- **Métricas**: Redis + Horizon
-
-### 🔧 Configuração
-
-Configure as variáveis de ambiente no arquivo `.env`:
+### Variáveis de ambiente principais
 
 ```env
-OPENAI_API_KEY=sua_chave_openai
-REDIS_HOST=fila-redis
-DB_HOST=fila-db
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4.1-nano
+
+DB_HOST=127.0.0.1
+DB_DATABASE=fila_ia
+
+REDIS_HOST=127.0.0.1
 ```
 
-### 📈 Performance
+### API — Endpoints principais
 
-- **Tempo de Processamento**: 3-5 segundos por requisição
-- **Throughput**: Até 15 workers simultâneos
-- **Cache Hit Rate**: 60-80% para requisições similares
+#### Autenticação
 
-### 🛠️ Desenvolvimento
-
-```bash
-# Executar testes
-docker exec fila-api php artisan test
-
-# Verificar status das filas
-docker exec fila-api php artisan queue:failed
-
-# Monitorar logs
-docker exec fila-api tail -f storage/logs/laravel.log
+Todas as requisições exigem o header:
+```
+X-API-Key: sua-chave-de-api
 ```
 
-### 📝 Changelog
+#### POST /api/v1/requests — Enviar requisição
 
-#### v1.1.0 (2025-10-03) 💰 SISTEMA DE CUSTOS
-- ✅ **Sistema completo de custos**: Cálculo automático USD/BRL por token
-- ✅ **Estatísticas reais**: Dashboards com dados reais e gráficos dinâmicos
-- ✅ **Filtros avançados**: Período de 6 meses, datas personalizáveis
-- ✅ **Segurança aprimorada**: Rate limiting, auditoria e logs
-- ✅ **Performance otimizada**: Redução de 10-15s para 3-5s por requisição
-- ✅ **Projeto limpo**: Remoção de arquivos desnecessários e otimização
+**Modo simples (prompt):**
+```json
+{
+  "prompt": "Olá, como posso agendar uma consulta?",
+  "session_id": "tenant_1_contact_42",
+  "parameters": { "temperature": 0.7, "max_tokens": 500 }
+}
+```
 
-### 📄 Licença
+**Modo avançado (tool calling):**
+```json
+{
+  "messages": [
+    { "role": "system", "content": "Você é um assistente de agendamentos." },
+    { "role": "user",   "content": "Quais horários estão disponíveis?" }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_available_slots",
+        "description": "Busca horários disponíveis no calendário.",
+        "parameters": { "type": "object", "properties": {} }
+      }
+    }
+  ],
+  "parameters": { "temperature": 0.7, "max_tokens": 500 }
+}
+```
 
-MIT License
+**Resposta (202):**
+```json
+{ "id": "uuid", "status": "pending", "message": "Use o ID para consultar o status." }
+```
 
-### 👥 Contribuição
+#### GET /api/v1/requests/{id} — Consultar resultado
 
-1. Fork o projeto
-2. Crie uma branch para sua feature
-3. Commit suas mudanças
-4. Push para a branch
-5. Abra um Pull Request
+**Concluído com texto:**
+```json
+{
+  "status": "completed",
+  "result": {
+    "finish_reason": "stop",
+    "response": "Resposta da IA aqui",
+    "tokens_input": 120,
+    "tokens_output": 45,
+    "done": true
+  }
+}
+```
+
+**Concluído com tool_calls:**
+```json
+{
+  "status": "completed",
+  "result": {
+    "finish_reason": "tool_calls",
+    "tool_calls": [{ "id": "call_abc", "function": { "name": "get_available_slots", "arguments": "{}" } }],
+    "assistant_message": { "role": "assistant", "tool_calls": [...] },
+    "done": false
+  }
+}
+```
+
+> Quando `finish_reason = "tool_calls"`: execute as funções localmente, adicione os resultados como `role: "tool"` no array `messages` e reenvie via POST. O loop continua até `finish_reason = "stop"`.
+
+Documentação completa da API: [`docs/guia-api-cliente.md`](docs/guia-api-cliente.md)
+
+### Monitoramento
+
+- **Horizon Dashboard**: `http://localhost:8000/horizon`
+- **Logs**: `storage/logs/laravel.log`
+- **Stats de tokens por cliente**: `GET /api/v1/stats/fast`
+
+### Performance
+
+- Tempo médio por requisição: **1–3 segundos**
+- Cache hit evita chamada à OpenAI para prompts idênticos
+- Tracking de tokens apenas em Redis (zero queries extras por requisição)
 
 ---
 
