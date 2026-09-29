@@ -77,6 +77,7 @@ class FastProcessGPTRequest implements ShouldQueue
                 'model' => $model,
                 'cost_usd' => $costUsd,
                 'cost_brl' => $costBrl,
+                'cache_hit' => (bool) ($result['_cache_hit'] ?? false),
             ]);
 
             // Log otimizado apenas para requests lentos (>3s) ou com cache miss

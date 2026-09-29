@@ -25,6 +25,10 @@ class DashboardController extends Controller
             $todayRequests = GPTRequest::whereDate('created_at', today())->count();
             $completedRequests = GPTRequest::where('status', 'completed')->count();
             $failedRequests = GPTRequest::where('status', 'failed')->count();
+
+            // Números reais de período (30 dias e última semana)
+            $requestsLast30Days = GPTRequest::where('created_at', '>=', now()->subDays(30))->count();
+            $requestsLastWeek = GPTRequest::where('created_at', '>=', now()->subDays(7))->count();
             
             // Requisições em processamento (filas)
             $processingRequests = $this->getProcessingRequestsCount();
@@ -55,10 +59,13 @@ class DashboardController extends Controller
                 'tokenStats',
                 'requestsByDay',
                 'cacheStats',
-                'serviceStatus'
+                'serviceStatus',
+                'requestsLast30Days',
+                'requestsLastWeek'
             ));
             
         } catch (\Exception $e) {
+            \Log::error('Erro ao carregar dashboard', ['exception' => $e->getMessage()]);
             // Em caso de erro, retorna valores padrão
             return view('dashboard', [
                 'apiKeysCount' => 0,
@@ -71,7 +78,9 @@ class DashboardController extends Controller
                 'tokenStats' => [],
                 'requestsByDay' => [],
                 'cacheStats' => [],
-                'serviceStatus' => []
+                'serviceStatus' => [],
+                'requestsLast30Days' => 0,
+                'requestsLastWeek' => 0
             ]);
         }
     }
@@ -101,59 +110,56 @@ class DashboardController extends Controller
      */
     private function getPerformanceStats(): array
     {
+        // Cada métrica é calculada isoladamente: se uma falhar, as outras continuam
+        // aparecendo normalmente (antes, uma única exceção zerava o painel inteiro).
+        $totalRequests = GPTRequest::count();
+        $successfulRequests = GPTRequest::where('status', 'completed')->count();
+
+        $avgProcessingTime = 0;
         try {
-            // Tempo médio de processamento (em milissegundos)
             $avgProcessingTime = GPTRequest::whereNotNull('processing_time')
                 ->where('status', 'completed')
                 ->avg('processing_time');
-            
-            // Taxa de sucesso
-            $totalRequests = GPTRequest::count();
-            $successfulRequests = GPTRequest::where('status', 'completed')->count();
-            $successRate = $totalRequests > 0 ? ($successfulRequests / $totalRequests) * 100 : 0;
-            
-            // Cache Hit Rate
+        } catch (\Exception $e) {
+            \Log::warning('Dashboard: falha ao calcular avg_processing_time', ['exception' => $e->getMessage()]);
+        }
+
+        $successRate = $totalRequests > 0 ? ($successfulRequests / $totalRequests) * 100 : 0;
+
+        // Cache Hit Rate — usa a coluna real `cache_hit` (antes apontava para
+        // `cache_info->cache_hit`, coluna que nunca existiu na tabela e
+        // derrubava esta função inteira via exceção silenciosa)
+        $cacheHitCount = 0;
+        try {
             $cacheHitCount = GPTRequest::where('status', 'completed')
-                ->where('cache_info->cache_hit', true)
+                ->where('cache_hit', true)
                 ->count();
-            $cacheHitRate = $successfulRequests > 0 ? ($cacheHitCount / $successfulRequests) * 100 : 0;
-            
-            // Requisições por hora (últimos 30 dias)
+        } catch (\Exception $e) {
+            \Log::warning('Dashboard: falha ao calcular cache_hit_count', ['exception' => $e->getMessage()]);
+        }
+        $cacheHitRate = $successfulRequests > 0 ? ($cacheHitCount / $successfulRequests) * 100 : 0;
+
+        // Requisições por hora do dia (agregado dos últimos 30 dias, para ter volume suficiente)
+        $requestsPerHour = collect();
+        try {
             $requestsPerHour = GPTRequest::where('created_at', '>=', now()->subDays(30))
                 ->selectRaw('HOUR(created_at) as hour, COUNT(*) as count')
                 ->groupBy('hour')
                 ->orderBy('hour')
                 ->get();
-            
-            // DEBUG: Log dos dados para verificar
-            \Log::info('Dashboard Debug - requestsPerHour:', [
-                'count' => $requestsPerHour->count(),
-                'data' => $requestsPerHour->toArray(),
-                'total_requests' => GPTRequest::count(),
-                'last_30d_requests' => GPTRequest::where('created_at', '>=', now()->subDays(30))->count()
-            ]);
-            
-            return [
-                'avg_processing_time' => round($avgProcessingTime ?? 0, 0),
-                'success_rate' => round($successRate, 1),
-                'cache_hit_rate' => round($cacheHitRate, 1),
-                'requests_per_hour' => $requestsPerHour,
-                'total_requests' => $totalRequests,
-                'successful_requests' => $successfulRequests,
-                'cache_hits' => $cacheHitCount
-            ];
-            
         } catch (\Exception $e) {
-            return [
-                'avg_processing_time' => 0,
-                'success_rate' => 0,
-                'cache_hit_rate' => 0,
-                'requests_per_hour' => [],
-                'total_requests' => 0,
-                'successful_requests' => 0,
-                'cache_hits' => 0
-            ];
+            \Log::warning('Dashboard: falha ao calcular requests_per_hour', ['exception' => $e->getMessage()]);
         }
+
+        return [
+            'avg_processing_time' => round($avgProcessingTime ?? 0, 0),
+            'success_rate' => round($successRate, 1),
+            'cache_hit_rate' => round($cacheHitRate, 1),
+            'requests_per_hour' => $requestsPerHour,
+            'total_requests' => $totalRequests,
+            'successful_requests' => $successfulRequests,
+            'cache_hits' => $cacheHitCount
+        ];
     }
     
     /**
@@ -254,8 +260,9 @@ class DashboardController extends Controller
     {
         try {
             $totalRequests = GPTRequest::where('status', 'completed')->count();
+            // Usa a coluna real `cache_hit` (antes: `cache_info->cache_hit`, que não existe)
             $cacheHits = GPTRequest::where('status', 'completed')
-                ->where('cache_info->cache_hit', true)
+                ->where('cache_hit', true)
                 ->count();
             $cacheMisses = $totalRequests - $cacheHits;
             $hitRate = $totalRequests > 0 ? ($cacheHits / $totalRequests) * 100 : 0;
@@ -270,7 +277,7 @@ class DashboardController extends Controller
                     ->where('status', 'completed')->count();
                 $dayHits = GPTRequest::whereDate('created_at', $dateKey)
                     ->where('status', 'completed')
-                    ->where('cache_info->cache_hit', true)
+                    ->where('cache_hit', true)
                     ->count();
                 $dayHitRate = $dayTotal > 0 ? ($dayHits / $dayTotal) * 100 : 0;
                 
@@ -290,6 +297,7 @@ class DashboardController extends Controller
                 'by_day' => $cacheByDay
             ];
         } catch (\Exception $e) {
+            \Log::warning('Dashboard: falha ao calcular cache stats', ['exception' => $e->getMessage()]);
             return [
                 'hit_rate' => 0,
                 'total_hits' => 0,
@@ -359,6 +367,40 @@ class DashboardController extends Controller
                 'error' => 'Erro ao carregar dados',
                 'timestamp' => now()->format('H:i:s')
             ], 500);
+        }
+    }
+
+    /**
+     * Endpoint leve para o gráfico de ondas em tempo real (polling a cada 5s).
+     * Retorna apenas números pequenos e rápidos de calcular — nada de queries pesadas.
+     */
+    public function liveMetrics()
+    {
+        try {
+            $requestsLastMinute = GPTRequest::where('created_at', '>=', now()->subMinute())->count();
+            $requestsLast5Seconds = GPTRequest::where('created_at', '>=', now()->subSeconds(5))->count();
+            $processing = $this->getProcessingRequestsCount();
+
+            $lastCompleted = GPTRequest::where('status', 'completed')
+                ->whereNotNull('processing_time')
+                ->orderBy('completed_at', 'desc')
+                ->value('processing_time');
+
+            return response()->json([
+                'timestamp' => now()->format('H:i:s'),
+                'requests_last_minute' => $requestsLastMinute,
+                'requests_last_5s' => $requestsLast5Seconds,
+                'processing' => $processing,
+                'last_response_time_ms' => $lastCompleted ?? 0,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'timestamp' => now()->format('H:i:s'),
+                'requests_last_minute' => 0,
+                'requests_last_5s' => 0,
+                'processing' => 0,
+                'last_response_time_ms' => 0,
+            ]);
         }
     }
 

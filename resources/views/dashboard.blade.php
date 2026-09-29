@@ -76,6 +76,32 @@
                 </div>
             </div>
 
+            <!-- Volume Real de Requisições (30 dias / Última semana) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-2xl font-bold text-gray-900" id="requests-30d">{{ number_format($requestsLast30Days ?? 0) }}</div>
+                            <div class="text-sm text-gray-600 font-medium">Requisições — Últimos 30 dias</div>
+                        </div>
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <div class="w-6 h-6 bg-blue-500 rounded"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-2xl font-bold text-gray-900" id="requests-7d">{{ number_format($requestsLastWeek ?? 0) }}</div>
+                            <div class="text-sm text-gray-600 font-medium">Requisições — Última semana</div>
+                        </div>
+                        <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <div class="w-6 h-6 bg-purple-500 rounded"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Layout Principal em 2 Colunas -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 
@@ -127,14 +153,33 @@
                     <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
                         <div class="p-6">
                             <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-lg font-bold text-gray-900">📈 Requisições por Hora</h3>
-                                <span class="text-sm text-gray-500 bg-blue-50 px-2 py-1 rounded">Últimas 24h</span>
+                                <h3 class="text-lg font-bold text-gray-900">📈 Requisições por Hora do Dia</h3>
+                                <span class="text-sm text-gray-500 bg-blue-50 px-2 py-1 rounded">Últimos 30 dias</span>
                             </div>
                             <div class="h-64">
                                 <canvas id="performanceChart"></canvas>
                             </div>
                             <div class="mt-3 text-xs text-gray-500 text-center">
-                                💡 Use este gráfico para identificar picos de uso e planejar recursos
+                                💡 Soma de todas as requisições dos últimos 30 dias, agrupadas pela hora do dia em que ocorreram
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 🌊 GRÁFICO: Tempo Real (Ondas ao vivo, atualiza a cada 5s) -->
+                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
+                        <div class="p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-bold text-gray-900">🌊 Atividade em Tempo Real</h3>
+                                <span class="text-sm text-green-700 bg-green-50 px-2 py-1 rounded flex items-center gap-1">
+                                    <span class="w-2 h-2 bg-green-500 rounded-full inline-block animate-pulse"></span>
+                                    Ao vivo · a cada 5s
+                                </span>
+                            </div>
+                            <div class="h-64">
+                                <canvas id="liveWaveChart"></canvas>
+                            </div>
+                            <div class="mt-3 text-xs text-gray-500 text-center">
+                                💡 Requisições no último minuto (janela deslizante) — atualizado automaticamente, sem precisar recarregar a página
                             </div>
                         </div>
                     </div>
@@ -144,7 +189,7 @@
                         <div class="p-6">
                             <div class="flex items-center justify-between mb-4">
                                 <h3 class="text-lg font-bold text-gray-900">🔄 Status das Requisições</h3>
-                                <span class="text-sm text-gray-500 bg-green-50 px-2 py-1 rounded">Tempo Real</span>
+                                <span class="text-sm text-gray-500 bg-green-50 px-2 py-1 rounded">Totais Acumulados</span>
                             </div>
                             <div class="h-64">
                                 <canvas id="queueChart"></canvas>
@@ -409,7 +454,7 @@
                             <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                             </svg>
-                            <p class="text-lg font-medium">Nenhuma requisição nas últimas 24h</p>
+                            <p class="text-lg font-medium">Nenhuma requisição nos últimos 30 dias</p>
                             <p class="text-sm">Faça algumas requisições para ver o padrão de uso</p>
                         </div>
                     </div>
@@ -478,6 +523,88 @@
             });
         }
 
+        // 🌊 GRÁFICO DE ONDAS EM TEMPO REAL — atualiza a cada 5 segundos via polling
+        let liveWaveChart;
+        const LIVE_WINDOW_SIZE = 30; // 30 pontos x 5s = últimos 2min30s de histórico visível
+
+        function initializeLiveWaveChart() {
+            const canvas = document.getElementById('liveWaveChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, 250);
+            gradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+            gradient.addColorStop(1, 'rgba(16, 185, 129, 0.02)');
+
+            liveWaveChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array(LIVE_WINDOW_SIZE).fill(''),
+                    datasets: [{
+                        label: 'Requisições no último minuto',
+                        data: Array(LIVE_WINDOW_SIZE).fill(0),
+                        borderColor: '#10B981',
+                        backgroundColor: gradient,
+                        borderWidth: 2,
+                        tension: 0.45,
+                        fill: true,
+                        pointRadius: 0,
+                        cubicInterpolationMode: 'monotone'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 400, easing: 'easeOutQuad' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.parsed.y} requisição(ões)`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { precision: 0 },
+                            grid: { color: 'rgba(0, 0, 0, 0.06)' }
+                        },
+                        x: { display: false }
+                    }
+                }
+            });
+
+            pollLiveMetrics();
+            setInterval(pollLiveMetrics, 5000);
+        }
+
+        function pollLiveMetrics() {
+            fetch('{{ route('dashboard.api.live') }}')
+                .then(response => response.json())
+                .then(data => {
+                    if (!liveWaveChart) return;
+
+                    const chartData = liveWaveChart.data.datasets[0].data;
+                    chartData.push(data.requests_last_minute ?? 0);
+                    chartData.shift();
+
+                    const labels = liveWaveChart.data.labels;
+                    labels.push(data.timestamp ?? '');
+                    labels.shift();
+
+                    liveWaveChart.update('none');
+
+                    // Também sincroniza os cards "Em Processamento" e última atualização
+                    const processingEl = document.getElementById('processing-requests');
+                    if (processingEl && typeof data.processing === 'number') {
+                        processingEl.textContent = data.processing;
+                    }
+                    document.getElementById('last-update').textContent = data.timestamp ?? new Date().toLocaleTimeString();
+                })
+                .catch(() => { /* silencioso: não interrompe o dashboard se a rede falhar por um instante */ });
+        }
+
         // Função para atualizar estatísticas de tokens
         function updateTokenStats() {
             // Aqui você pode implementar a lógica para buscar estatísticas reais de tokens
@@ -488,6 +615,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             updateServiceStatus();
             initializeCharts();
+            initializeLiveWaveChart();
             
             // Atualiza a cada 30 segundos
             setInterval(updateServiceStatus, 30000);

@@ -34,6 +34,7 @@ Route::get('/api/test-direct', function () {
 
 Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 Route::get('/dashboard/api/data', [App\Http\Controllers\DashboardController::class, 'apiData'])->middleware(['auth', 'verified'])->name('dashboard.api.data');
+Route::get('/dashboard/api/live', [App\Http\Controllers\DashboardController::class, 'liveMetrics'])->middleware(['auth', 'verified'])->name('dashboard.api.live');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
