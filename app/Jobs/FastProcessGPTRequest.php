@@ -18,7 +18,7 @@ class FastProcessGPTRequest implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 2;
-    public $timeout = 18; // HTTP timeout é 12s + 6s de margem para processamento
+    public $timeout = 36; // HTTP timeout é 30s + 6s de margem para processamento
     public $maxExceptions = 2;
 
     protected GPTRequest $request;

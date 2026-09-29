@@ -423,6 +423,7 @@ class IAService
             $baseParams['temperature'] = (float) ($parameters['temperature'] ?? 0.7);
         } else {
             $baseParams['temperature'] = (float) ($parameters['temperature'] ?? 0.7);
+            // 600 tokens é suficiente para respostas de WhatsApp e reduz o tempo de geração
             $baseParams['max_tokens']  = (int) ($parameters['max_tokens'] ?? 600);
         }
 

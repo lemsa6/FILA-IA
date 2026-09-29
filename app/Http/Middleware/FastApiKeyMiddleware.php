@@ -55,11 +55,12 @@ class FastApiKeyMiddleware
                 return response()->json(['error' => 'API key inválida'], 403);
             }
             
-            // Cache por 5 minutos - reduz 90% das queries DB
+            // Cache por 5 minutos — inclui todos os campos necessários, zero DB nas próximas requisições
             $keyData = [
-                'id' => $keyModel->id,
-                'name' => $keyModel->name,
-                'status' => $keyModel->status
+                'id'     => $keyModel->id,
+                'name'   => $keyModel->name,
+                'status' => $keyModel->status,
+                'model'  => $keyModel->toArray(),
             ];
             Cache::put($cacheKey, $keyData, 300);
         }
@@ -73,12 +74,9 @@ class FastApiKeyMiddleware
             ], 429);
         }
 
-        // Adiciona dados mínimos ao request
+        // Adiciona dados ao request — sem DB query adicional
         $request->merge(['api_key_id' => $keyData['id']]);
-        
-        // Adiciona o objeto apiKey ao request para compatibilidade com o controlador
-        $apiKeyModel = ApiKey::find($keyData['id']);
-        $request->apiKey = $apiKeyModel;
+        $request->apiKey = (new ApiKey())->forceFill($keyData['model']);
         
         return $next($request);
     }
